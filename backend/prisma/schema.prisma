@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Categoria {
+  id        Int       @id @default(autoincrement())
+  nome      String    @unique
+  descricao String?
+  imagem    String?
+  ativo     Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  produtos  Produto[]
+}
+
+model Fornecedor {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  empresa   String?
+  email     String?
+  telefone  String?
+  site      String?
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  produtos    Produto[]
+  pedidoItens PedidoItem[]
+}
+
+model Produto {
+  id              Int          @id @default(autoincrement())
+  nome            String
+  descricao       String?
+  preco           Decimal      @db.Decimal(10, 2)
+  precoPromo      Decimal?     @db.Decimal(10, 2)
+  imagem          String?
+  estoque         Int          @default(0)
+  destaque        Boolean      @default(false)
+  oferta          Boolean      @default(false)
+  ativo           Boolean      @default(true)
+  categoriaId     Int
+  fornecedorId    Int?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  custoFornecedor Decimal?     @db.Decimal(10, 2)
+  linkFornecedor  String?
+  skuFornecedor   String?
+
+  avaliacoes      Avaliacao[]
+  pedidoItens     PedidoItem[]
+
+  categoria       Categoria    @relation(fields: [categoriaId], references: [id])
+  fornecedor      Fornecedor?  @relation(fields: [fornecedorId], references: [id])
+}
+
+model Cupom {
+  id          Int       @id @default(autoincrement())
+  codigo      String    @unique
+  tipo        String
+  valor       Decimal   @db.Decimal(10, 2)
+  valorMinimo Decimal?  @db.Decimal(10, 2)
+  validade    DateTime?
+  ativo       Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  limiteUsos  Int?
+  usosAtual   Int       @default(0)
+
+  pedidos     Pedido[]
+}
+
+model Pedido {
+  id          Int          @id @default(autoincrement())
+  nomeCliente String
+  email       String
+  telefone    String
+  cep         String
+  estado      String
+  endereco    String
+  numero      String
+  complemento String?
+  bairro      String
+  cidade      String
+
+  subtotal    Decimal      @db.Decimal(10, 2)
+  frete       Decimal      @default(0) @db.Decimal(10, 2)
+  total       Decimal      @db.Decimal(10, 2)
+
+  pagamento   String
+  status      String       @default("PENDENTE")
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  cupomId     Int?
+  desconto    Decimal      @default(0) @db.Decimal(10, 2)
+
+  cupom       Cupom?       @relation(fields: [cupomId], references: [id])
+  itens       PedidoItem[]
+}
+
+model PedidoItem {
+  id          Int      @id @default(autoincrement())
+  pedidoId    Int
+  produtoId   Int
+  nomeProduto String
+  preco       Decimal  @db.Decimal(10, 2)
+  quantidade  Int
+  createdAt   DateTime @default(now())
+
+  // Dados do fornecedor no momento da venda
+  fornecedorId    Int?
+  fornecedorNome  String?
+  skuFornecedor   String?
+  custoFornecedor Decimal? @db.Decimal(10, 2)
+  linkFornecedor  String?
+
+  // Controle do processo de dropshipping
+  statusFornecedor       String   @default("AGUARDANDO_FORNECEDOR")
+  numeroPedidoFornecedor String?
+
+  dataEncaminhamento     DateTime?
+  dataPedidoFornecedor   DateTime?
+  dataEnvioFornecedor    DateTime?
+  dataEntregaFornecedor  DateTime?
+
+  pedido      Pedido      @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  produto     Produto     @relation(fields: [produtoId], references: [id])
+  fornecedor  Fornecedor? @relation(fields: [fornecedorId], references: [id])
+}
+
+model Avaliacao {
+  id         Int       @id @default(autoincrement())
+  nome       String
+  email      String?
+  nota       Int
+  comentario String?
+
+  aprovado   Boolean   @default(false)
+  ativo      Boolean   @default(true)
+
+  // Preenchido somente quando a avaliação for de um produto.
+  // Quando for avaliação da loja, fica null.
+  produtoId  Int?
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  produto    Produto?  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+}
+
+model Admin {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  email     String   @unique
+  senha     String
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
