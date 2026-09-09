@@ -1,22 +1,25 @@
-// =====================================================
-// MIMO QUATRO PATAS
-// services/api.ts
-// =====================================================
-
 const API_URL = (
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:3001/api"
-).replace(/\/+$/, "");
-
-// =====================================================
-// TIPOS
-// =====================================================
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+)
+  .replace(/\/+$/, "")
+  .replace(/\/api$/, "");
 
 export interface Categoria {
   id: number;
   nome: string;
   descricao?: string | null;
   imagem?: string | null;
+  ativo?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Fornecedor {
+  id: number;
+  nome: string;
+  email?: string | null;
+  telefone?: string | null;
+  site?: string | null;
   ativo?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -32,8 +35,26 @@ export interface Produto {
   estoque: number;
   ativo: boolean;
   destaque: boolean;
+  oferta: boolean;
   categoriaId?: number | null;
   categoria?: Categoria | null;
+  fornecedorId?: number | null;
+  fornecedor?: Fornecedor | null;
+  custoFornecedor?: number | string | null;
+  skuFornecedor?: string | null;
+  linkFornecedor?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Cupom {
+  id: number;
+  codigo: string;
+  tipo: string;
+  valor: number | string;
+  valorMinimo?: number | string | null;
+  validade?: string | null;
+  ativo: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -41,758 +62,488 @@ export interface Produto {
 export interface Avaliacao {
   id: number;
   nome: string;
-  email?: string | null;
   nota: number;
-  comentario?: string | null;
+  comentario: string;
+  produtoId: number;
   aprovado: boolean;
   ativo: boolean;
-  produtoId: number;
-  produto?: {
-    id: number;
-    nome: string;
-    imagem?: string | null;
-  } | null;
   createdAt?: string;
   updatedAt?: string;
 }
 
-export interface ApiError {
-  success?: boolean;
+export interface PedidoItem {
+  id: number;
+  produtoId: number;
+  produto?: Produto | null;
+  nomeProduto?: string | null;
+  quantidade: number;
+  precoUnitario: number | string;
+  subtotal?: number | string;
+  fornecedorId?: number | null;
+  fornecedorNome?: string | null;
+  skuFornecedor?: string | null;
+  custoFornecedor?: number | string | null;
+  linkFornecedor?: string | null;
+  statusFornecedor?: string | null;
+  numeroPedidoFornecedor?: string | null;
+  dataEncaminhamento?: string | null;
+  dataPedidoFornecedor?: string | null;
+  dataEnvioFornecedor?: string | null;
+  dataEntregaFornecedor?: string | null;
+}
+
+export interface Pedido {
+  id: number;
+  nomeCliente: string;
+  emailCliente: string;
+  telefoneCliente?: string | null;
+  cep: string;
+  endereco: string;
+  numero: string;
+  complemento?: string | null;
+  bairro: string;
+  cidade: string;
+  estado: string;
+  subtotal: number | string;
+  frete: number | string;
+  desconto: number | string;
+  total: number | string;
+  formaPagamento: string;
+  status: string;
+  cupomId?: number | null;
+  codigoCupom?: string | null;
+  itens?: PedidoItem[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface UsuarioAdmin {
+  id: number;
+  nome?: string | null;
+  email: string;
+  ativo?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
   message?: string;
   error?: string;
 }
 
-// =====================================================
-// RESPOSTAS
-// =====================================================
+/**
+ * Converte valores numéricos vindos da API.
+ */
+export function converterNumero(
+  valor: number | string | null | undefined
+): number {
+  if (valor === null || valor === undefined || valor === "") {
+    return 0;
+  }
 
-export interface ProdutosResponse {
-  produtos: Produto[];
+  const numero =
+    typeof valor === "number"
+      ? valor
+      : Number(String(valor).replace(",", "."));
+
+  return Number.isFinite(numero) ? numero : 0;
 }
 
-export interface CategoriasResponse {
-  categorias: Categoria[];
+/**
+ * Retorna a URL completa de uma imagem.
+ *
+ * Exemplos:
+ * /uploads/produto.jpg
+ * http://localhost:3001/uploads/produto.jpg
+ * https://mimo-quatro-patas.onrender.com/uploads/produto.jpg
+ * /imagem/produto.png
+ */
+export function getImagemUrl(
+  imagem: string | null | undefined
+): string {
+  if (!imagem) {
+    return "/imagem/placeholder-produto.png";
+  }
+
+  const imagemNormalizada = String(imagem).trim();
+
+  if (!imagemNormalizada) {
+    return "/imagem/placeholder-produto.png";
+  }
+
+  // URL externa completa
+  if (
+    imagemNormalizada.startsWith("http://") ||
+    imagemNormalizada.startsWith("https://")
+  ) {
+    return imagemNormalizada;
+  }
+
+  // Imagens públicas do frontend
+  if (
+    imagemNormalizada.startsWith("/imagem/") ||
+    imagemNormalizada.startsWith("/images/") ||
+    imagemNormalizada.startsWith("/produtos/")
+  ) {
+    return imagemNormalizada;
+  }
+
+  // Uploads armazenados no backend
+  if (imagemNormalizada.startsWith("/uploads/")) {
+    return `${API_URL}${imagemNormalizada}`;
+  }
+
+  // Caso venha apenas o nome do arquivo
+  if (!imagemNormalizada.startsWith("/")) {
+    return `${API_URL}/uploads/${imagemNormalizada}`;
+  }
+
+  return imagemNormalizada;
 }
 
-export interface AvaliacoesResponse {
-  avaliacoes: Avaliacao[];
-}
-
-// =====================================================
-// URL DA API
-// =====================================================
-
+/**
+ * Retorna a URL base da API.
+ */
 export function getApiUrl(): string {
   return API_URL;
 }
 
-// =====================================================
-// URL BASE DO BACKEND
-// =====================================================
-
-function getBackendUrl(): string {
-  return API_URL.replace(/\/api\/?$/, "");
-}
-
-// =====================================================
-// URL DE IMAGEM
-// =====================================================
-
-export function getImagemUrl(
-  imagem?: string | null
-): string | null {
-  if (!imagem) {
-    return null;
-  }
-
-  const valor = String(imagem).trim();
-
-  if (!valor) {
-    return null;
-  }
-
-  const backendUrl = getBackendUrl();
-
-  // ---------------------------------------------------
-  // URL externa
-  // ---------------------------------------------------
-
-  if (
-    valor.startsWith("http://") ||
-    valor.startsWith("https://")
-  ) {
-    // Se for uma URL do próprio backend usando
-    // /api/uploads, corrige para /uploads.
-    if (
-      valor.startsWith(`${backendUrl}/api/uploads/`)
-    ) {
-      return valor.replace(
-        `${backendUrl}/api/uploads/`,
-        `${backendUrl}/uploads/`
-      );
-    }
-
-    // Também corrige caso exista /api/api/uploads.
-    if (
-      valor.startsWith(`${backendUrl}/api/api/uploads/`)
-    ) {
-      return valor.replace(
-        `${backendUrl}/api/api/uploads/`,
-        `${backendUrl}/uploads/`
-      );
-    }
-
-    return valor;
-  }
-
-  // ---------------------------------------------------
-  // Corrigir:
-  //
-  // /api/uploads/produto.jpg
-  //
-  // para:
-  //
-  // /uploads/produto.jpg
-  // ---------------------------------------------------
-
-  if (valor.startsWith("/api/uploads/")) {
-    const caminho = valor.replace(
-      /^\/api\/uploads\//,
-      "/uploads/"
-    );
-
-    return `${backendUrl}${caminho}`;
-  }
-
-  // ---------------------------------------------------
-  // Corrigir:
-  //
-  // api/uploads/produto.jpg
-  // ---------------------------------------------------
-
-  if (valor.startsWith("api/uploads/")) {
-    const caminho = valor.replace(
-      /^api\/uploads\//,
-      "/uploads/"
-    );
-
-    return `${backendUrl}${caminho}`;
-  }
-
-  // ---------------------------------------------------
-  // Upload correto:
-  //
-  // /uploads/produto.jpg
-  // ---------------------------------------------------
-
-  if (valor.startsWith("/uploads/")) {
-    return `${backendUrl}${valor}`;
-  }
-
-  // ---------------------------------------------------
-  // Upload sem barra inicial:
-  //
-  // uploads/produto.jpg
-  // ---------------------------------------------------
-
-  if (valor.startsWith("uploads/")) {
-    return `${backendUrl}/${valor}`;
-  }
-
-  // ---------------------------------------------------
-  // Imagem local do Next.js
-  //
-  // Exemplo:
-  // /produtos/cama.jpg
-  // ---------------------------------------------------
-
-  if (valor.startsWith("/produtos/")) {
-    return valor;
-  }
-
-  // ---------------------------------------------------
-  // Outros caminhos absolutos
-  // ---------------------------------------------------
-
-  if (valor.startsWith("/")) {
-    return `${backendUrl}${valor}`;
-  }
-
-  // ---------------------------------------------------
-  // Nome simples do arquivo
-  //
-  // Exemplo:
-  // produto.jpg
-  // ---------------------------------------------------
-
-  return `${backendUrl}/uploads/${valor}`;
-}
-
-// =====================================================
-// LEITURA SEGURA DA RESPOSTA
-// =====================================================
-
-async function lerResposta<T>(
-  resposta: Response
-): Promise<T> {
-  const texto = await resposta.text();
-
-  if (!texto) {
-    if (!resposta.ok) {
-      throw new Error(
-        `Erro na API. Status ${resposta.status} ${resposta.statusText}.`
-      );
-    }
-
-    return null as T;
-  }
-
-  let dados: unknown;
-
-  try {
-    dados = JSON.parse(texto);
-  } catch {
-    console.error(
-      "[API] Resposta não JSON:",
-      texto.substring(0, 500)
-    );
-
-    throw new Error(
-      `A API retornou uma resposta inválida. Status: ${resposta.status} ${resposta.statusText}.`
-    );
-  }
-
-  if (!resposta.ok) {
-    const erro = dados as ApiError;
-
-    throw new Error(
-      erro?.message ||
-        erro?.error ||
-        `Erro na API. Status ${resposta.status}.`
-    );
-  }
-
-  return dados as T;
-}
-
-// =====================================================
-// FETCH PADRÃO
-// =====================================================
-
-async function apiFetch<T>(
-  endpoint: string,
-  options?: RequestInit
-): Promise<T> {
-  const caminho = endpoint.startsWith("/")
-    ? endpoint
-    : `/${endpoint}`;
-
-  const url = `${API_URL}${caminho}`;
-
-  console.log(
-    "[API]",
-    options?.method || "GET",
-    url
-  );
-
-  const resposta = await fetch(url, {
-    ...options,
-    headers: {
-      Accept: "application/json",
-
-      ...(options?.body
-        ? {
-            "Content-Type": "application/json",
-          }
-        : {}),
-
-      ...options?.headers,
-    },
-  });
-
-  return lerResposta<T>(resposta);
-}
-
-// =====================================================
-// PRODUTOS
-// =====================================================
-
-// -----------------------------------------------------
-// LISTAR PRODUTOS
-// GET /api/produtos
-// -----------------------------------------------------
-
+/**
+ * Busca todos os produtos.
+ */
 export async function getProdutos(): Promise<Produto[]> {
-  const dados = await apiFetch<
-    Produto[] | ProdutosResponse
-  >("/produtos");
+  const response = await fetch(`${API_URL}/api/produtos`, {
+    cache: "no-store",
+  });
 
-  if (Array.isArray(dados)) {
-    return dados;
+  if (!response.ok) {
+    throw new Error("Erro ao buscar produtos.");
   }
 
-  if (
-    dados &&
-    typeof dados === "object" &&
-    "produtos" in dados &&
-    Array.isArray(dados.produtos)
-  ) {
-    return dados.produtos;
+  const data = await response.json();
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data.produtos)) {
+    return data.produtos;
+  }
+
+  if (Array.isArray(data.data)) {
+    return data.data;
   }
 
   return [];
 }
 
-// -----------------------------------------------------
-// BUSCAR PRODUTO POR ID
-// GET /api/produtos/:id
-// -----------------------------------------------------
-
+/**
+ * Busca um produto pelo ID.
+ */
 export async function getProdutoById(
-  id: number
-): Promise<Produto> {
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new Error("ID do produto inválido.");
-  }
-
-  const dados = await apiFetch<
-    Produto | { produto: Produto }
-  >(`/produtos/${id}`);
-
-  if (
-    dados &&
-    typeof dados === "object" &&
-    "produto" in dados
-  ) {
-    return dados.produto;
-  }
-
-  return dados as Produto;
-}
-
-// -----------------------------------------------------
-// CRIAR PRODUTO
-// POST /api/produtos
-// -----------------------------------------------------
-
-export async function criarProduto(
-  produto: Partial<Produto>
-): Promise<Produto> {
-  const dados = await apiFetch<
-    Produto | { produto: Produto }
-  >("/produtos", {
-    method: "POST",
-    body: JSON.stringify(produto),
+  id: number | string
+): Promise<Produto | null> {
+  const response = await fetch(`${API_URL}/api/produtos/${id}`, {
+    cache: "no-store",
   });
 
-  if (
-    dados &&
-    typeof dados === "object" &&
-    "produto" in dados
-  ) {
-    return dados.produto;
+  if (response.status === 404) {
+    return null;
   }
 
-  return dados as Produto;
+  if (!response.ok) {
+    throw new Error("Erro ao buscar produto.");
+  }
+
+  const data = await response.json();
+
+  if (data?.produto) {
+    return data.produto;
+  }
+
+  if (data?.data) {
+    return data.data;
+  }
+
+  return data;
 }
 
-// -----------------------------------------------------
-// ATUALIZAR PRODUTO
-// PUT /api/produtos/:id
-// -----------------------------------------------------
-
-export async function atualizarProduto(
-  id: number,
-  produto: Partial<Produto>
-): Promise<Produto> {
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new Error("ID do produto inválido.");
-  }
-
-  const dados = await apiFetch<
-    Produto | { produto: Produto }
-  >(`/produtos/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(produto),
-  });
-
-  if (
-    dados &&
-    typeof dados === "object" &&
-    "produto" in dados
-  ) {
-    return dados.produto;
-  }
-
-  return dados as Produto;
-}
-
-// -----------------------------------------------------
-// EXCLUIR PRODUTO
-// DELETE /api/produtos/:id
-// -----------------------------------------------------
-
-export async function excluirProduto(
-  id: number
-): Promise<void> {
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new Error("ID do produto inválido.");
-  }
-
-  await apiFetch<void>(`/produtos/${id}`, {
-    method: "DELETE",
-  });
-}
-
-// =====================================================
-// CATEGORIAS
-// =====================================================
-
-// -----------------------------------------------------
-// LISTAR CATEGORIAS
-// GET /api/categorias
-// -----------------------------------------------------
-
+/**
+ * Busca todas as categorias.
+ */
 export async function getCategorias(): Promise<Categoria[]> {
-  const dados = await apiFetch<
-    Categoria[] | CategoriasResponse
-  >("/categorias");
+  const response = await fetch(`${API_URL}/api/categorias`, {
+    cache: "no-store",
+  });
 
-  if (Array.isArray(dados)) {
-    return dados;
+  if (!response.ok) {
+    throw new Error("Erro ao buscar categorias.");
   }
 
-  if (
-    dados &&
-    typeof dados === "object" &&
-    "categorias" in dados &&
-    Array.isArray(dados.categorias)
-  ) {
-    return dados.categorias;
+  const data = await response.json();
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data.categorias)) {
+    return data.categorias;
+  }
+
+  if (Array.isArray(data.data)) {
+    return data.data;
   }
 
   return [];
 }
 
-// -----------------------------------------------------
-// BUSCAR CATEGORIA POR ID
-// GET /api/categorias/:id
-// -----------------------------------------------------
-
+/**
+ * Busca uma categoria pelo ID.
+ */
 export async function getCategoriaById(
-  id: number
-): Promise<Categoria> {
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new Error("ID da categoria inválido.");
+  id: number | string
+): Promise<Categoria | null> {
+  const response = await fetch(`${API_URL}/api/categorias/${id}`, {
+    cache: "no-store",
+  });
+
+  if (response.status === 404) {
+    return null;
   }
 
-  const dados = await apiFetch<
-    Categoria | { categoria: Categoria }
-  >(`/categorias/${id}`);
-
-  if (
-    dados &&
-    typeof dados === "object" &&
-    "categoria" in dados
-  ) {
-    return dados.categoria;
+  if (!response.ok) {
+    throw new Error("Erro ao buscar categoria.");
   }
 
-  return dados as Categoria;
+  const data = await response.json();
+
+  if (data?.categoria) {
+    return data.categoria;
+  }
+
+  if (data?.data) {
+    return data.data;
+  }
+
+  return data;
 }
 
-// =====================================================
-// AVALIAÇÕES
-// =====================================================
+/**
+ * Busca fornecedores.
+ */
+export async function getFornecedores(): Promise<Fornecedor[]> {
+  const response = await fetch(`${API_URL}/api/fornecedores`, {
+    cache: "no-store",
+  });
 
-// -----------------------------------------------------
-// LISTAR TODAS AS AVALIAÇÕES
-// GET /api/avaliacoes
-// -----------------------------------------------------
-
-export async function getAvaliacoes(): Promise<Avaliacao[]> {
-  const dados = await apiFetch<
-    Avaliacao[] | AvaliacoesResponse
-  >("/avaliacoes");
-
-  if (Array.isArray(dados)) {
-    return dados;
+  if (!response.ok) {
+    throw new Error("Erro ao buscar fornecedores.");
   }
 
-  if (
-    dados &&
-    typeof dados === "object" &&
-    "avaliacoes" in dados &&
-    Array.isArray(dados.avaliacoes)
-  ) {
-    return dados.avaliacoes;
+  const data = await response.json();
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data.fornecedores)) {
+    return data.fornecedores;
+  }
+
+  if (Array.isArray(data.data)) {
+    return data.data;
   }
 
   return [];
 }
 
-// -----------------------------------------------------
-// LISTAR AVALIAÇÕES DE UM PRODUTO
-// GET /api/avaliacoes?produtoId=:id
-// -----------------------------------------------------
+/**
+ * Busca pedidos.
+ */
+export async function getPedidos(): Promise<Pedido[]> {
+  const response = await fetch(`${API_URL}/api/pedidos`, {
+    cache: "no-store",
+  });
 
+  if (!response.ok) {
+    throw new Error("Erro ao buscar pedidos.");
+  }
+
+  const data = await response.json();
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data.pedidos)) {
+    return data.pedidos;
+  }
+
+  if (Array.isArray(data.data)) {
+    return data.data;
+  }
+
+  return [];
+}
+
+/**
+ * Busca um pedido pelo ID.
+ */
+export async function getPedidoById(
+  id: number | string
+): Promise<Pedido | null> {
+  const response = await fetch(`${API_URL}/api/pedidos/${id}`, {
+    cache: "no-store",
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error("Erro ao buscar pedido.");
+  }
+
+  const data = await response.json();
+
+  if (data?.pedido) {
+    return data.pedido;
+  }
+
+  if (data?.data) {
+    return data.data;
+  }
+
+  return data;
+}
+
+/**
+ * Busca avaliações de um produto.
+ */
 export async function getAvaliacoesByProduto(
-  produtoId: number
+  produtoId: number | string
 ): Promise<Avaliacao[]> {
-  if (
-    !Number.isInteger(produtoId) ||
-    produtoId <= 0
-  ) {
-    throw new Error("ID do produto inválido.");
-  }
-
-  const dados = await apiFetch<
-    Avaliacao[] | AvaliacoesResponse
-  >(
-    `/avaliacoes?produtoId=${encodeURIComponent(
-      produtoId
-    )}`
-  );
-
-  let lista: Avaliacao[] = [];
-
-  if (Array.isArray(dados)) {
-    lista = dados;
-  } else if (
-    dados &&
-    typeof dados === "object" &&
-    "avaliacoes" in dados &&
-    Array.isArray(dados.avaliacoes)
-  ) {
-    lista = dados.avaliacoes;
-  }
-
-  return lista.filter(
-    (avaliacao) =>
-      Number(avaliacao.produtoId) === produtoId
-  );
-}
-
-// -----------------------------------------------------
-// BUSCAR AVALIAÇÃO POR ID
-// GET /api/avaliacoes/:id
-// -----------------------------------------------------
-
-export async function getAvaliacaoById(
-  id: number
-): Promise<Avaliacao> {
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new Error("ID da avaliação inválido.");
-  }
-
-  const dados = await apiFetch<
-    Avaliacao | { avaliacao: Avaliacao }
-  >(`/avaliacoes/${id}`);
-
-  if (
-    dados &&
-    typeof dados === "object" &&
-    "avaliacao" in dados
-  ) {
-    return dados.avaliacao;
-  }
-
-  return dados as Avaliacao;
-}
-
-// -----------------------------------------------------
-// CRIAR AVALIAÇÃO
-// POST /api/avaliacoes
-// -----------------------------------------------------
-
-export async function criarAvaliacao(data: {
-  nome: string;
-  email?: string | null;
-  nota: number;
-  comentario?: string | null;
-  produtoId: number;
-}): Promise<Avaliacao> {
-  const dados = await apiFetch<
-    Avaliacao | {
-      success?: boolean;
-      message?: string;
-      avaliacao: Avaliacao;
+  const response = await fetch(
+    `${API_URL}/api/avaliacoes?produtoId=${produtoId}`,
+    {
+      cache: "no-store",
     }
-  >("/avaliacoes", {
+  );
+
+  if (!response.ok) {
+    throw new Error("Erro ao buscar avaliações.");
+  }
+
+  const data = await response.json();
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data.avaliacoes)) {
+    return data.avaliacoes;
+  }
+
+  if (Array.isArray(data.data)) {
+    return data.data;
+  }
+
+  return [];
+}
+
+/**
+ * Valida um cupom.
+ *
+ * O backend espera:
+ * POST /api/cupons/validar
+ * {
+ *   codigo,
+ *   subtotal
+ * }
+ */
+export async function validarCupom(
+  codigo: string,
+  subtotal: number
+) {
+  const response = await fetch(`${API_URL}/api/cupons/validar`, {
     method: "POST",
-    body: JSON.stringify(data),
-  });
-
-  if (
-    dados &&
-    typeof dados === "object" &&
-    "avaliacao" in dados
-  ) {
-    return dados.avaliacao;
-  }
-
-  return dados as Avaliacao;
-}
-
-// -----------------------------------------------------
-// ATUALIZAR AVALIAÇÃO
-// PUT /api/avaliacoes/:id
-// -----------------------------------------------------
-
-export async function atualizarAvaliacao(
-  id: number,
-  data: {
-    nome?: string;
-    email?: string | null;
-    nota?: number;
-    comentario?: string | null;
-    aprovado?: boolean;
-    ativo?: boolean;
-    produtoId?: number;
-  }
-): Promise<Avaliacao> {
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new Error("ID da avaliação inválido.");
-  }
-
-  const dados = await apiFetch<
-    Avaliacao | { avaliacao: Avaliacao }
-  >(`/avaliacoes/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(data),
-  });
-
-  if (
-    dados &&
-    typeof dados === "object" &&
-    "avaliacao" in dados
-  ) {
-    return dados.avaliacao;
-  }
-
-  return dados as Avaliacao;
-}
-
-// -----------------------------------------------------
-// ALTERAR APROVAÇÃO
-// PATCH /api/avaliacoes/:id/aprovacao
-// -----------------------------------------------------
-
-export async function alterarAprovacaoAvaliacao(
-  id: number,
-  aprovado: boolean
-): Promise<Avaliacao> {
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new Error("ID da avaliação inválido.");
-  }
-
-  const dados = await apiFetch<
-    Avaliacao | { avaliacao: Avaliacao }
-  >(`/avaliacoes/${id}/aprovacao`, {
-    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
-      aprovado,
+      codigo: codigo.trim().toUpperCase(),
+      subtotal,
     }),
   });
 
-  if (
-    dados &&
-    typeof dados === "object" &&
-    "avaliacao" in dados
-  ) {
-    return dados.avaliacao;
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data?.message || data?.error || "Cupom inválido."
+    );
   }
 
-  return dados as Avaliacao;
+  return data;
 }
 
-// -----------------------------------------------------
-// ALTERAR STATUS
-// PATCH /api/avaliacoes/:id/status
-// -----------------------------------------------------
-
-export async function alterarStatusAvaliacao(
-  id: number,
-  ativo: boolean
-): Promise<Avaliacao> {
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new Error("ID da avaliação inválido.");
-  }
-
-  const dados = await apiFetch<
-    Avaliacao | { avaliacao: Avaliacao }
-  >(`/avaliacoes/${id}/status`, {
-    method: "PATCH",
-    body: JSON.stringify({
-      ativo,
-    }),
-  });
-
-  if (
-    dados &&
-    typeof dados === "object" &&
-    "avaliacao" in dados
-  ) {
-    return dados.avaliacao;
-  }
-
-  return dados as Avaliacao;
-}
-
-// -----------------------------------------------------
-// EXCLUIR AVALIAÇÃO
-// DELETE /api/avaliacoes/:id
-// -----------------------------------------------------
-
-export async function excluirAvaliacao(
-  id: number
-): Promise<void> {
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new Error("ID da avaliação inválido.");
-  }
-
-  await apiFetch<void>(`/avaliacoes/${id}`, {
-    method: "DELETE",
+/**
+ * Formata um preço para Real brasileiro.
+ */
+export function formatarPreco(
+  valor: number | string | null | undefined
+): string {
+  return converterNumero(valor).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
   });
 }
 
-// =====================================================
-// STATUS DA API
-// =====================================================
+/**
+ * Verifica se o produto possui preço promocional válido.
+ */
+export function temPrecoPromocional(
+  produto: Produto
+): boolean {
+  const preco = converterNumero(produto.preco);
+  const precoPromo = converterNumero(produto.precoPromo);
 
-// GET /api/status
-
-export async function getApiStatus(): Promise<{
-  success: boolean;
-  message: string;
-  database: string;
-}> {
-  return apiFetch("/status");
+  return precoPromo > 0 && precoPromo < preco;
 }
 
-// =====================================================
-// EXPORT DEFAULT
-// =====================================================
+/**
+ * Retorna o preço atual do produto.
+ */
+export function getPrecoAtual(produto: Produto): number {
+  if (temPrecoPromocional(produto)) {
+    return converterNumero(produto.precoPromo);
+  }
 
-const api = {
-  getApiUrl,
-  getImagemUrl,
-  getProdutos,
-  getProdutoById,
-  criarProduto,
-  atualizarProduto,
-  excluirProduto,
-  getCategorias,
-  getCategoriaById,
-  getAvaliacoes,
-  getAvaliacoesByProduto,
-  getAvaliacaoById,
-  criarAvaliacao,
-  atualizarAvaliacao,
-  alterarAprovacaoAvaliacao,
-  alterarStatusAvaliacao,
-  excluirAvaliacao,
-  getApiStatus,
-};
+  return converterNumero(produto.preco);
+}
 
-export default api;
+/**
+ * Calcula o percentual de desconto.
+ */
+export function calcularDescontoProduto(
+  produto: Produto
+): number {
+  const preco = converterNumero(produto.preco);
+  const precoPromo = converterNumero(produto.precoPromo);
+
+  if (
+    preco <= 0 ||
+    precoPromo <= 0 ||
+    precoPromo >= preco
+  ) {
+    return 0;
+  }
+
+  return Math.round(
+    ((preco - precoPromo) / preco) * 100
+  );
+}
+
+export { API_URL };

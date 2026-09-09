@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
 import Link from "next/link";
 
 import AdicionarAoCarrinho from "@/components/AdicionarAoCarrinho";
-
 import { getImagemUrl } from "@/services/api";
 
 interface Categoria {
@@ -25,7 +23,7 @@ interface Produto {
   oferta: boolean;
   ativo: boolean;
   categoriaId: number;
-  categoria?: Categoria;
+  categoria?: Categoria | null;
   quantidadeVendida: number;
 }
 
@@ -41,8 +39,7 @@ export default function ProdutosMaisVendidos() {
         setErro(false);
 
         const rawApiUrl =
-          process.env.NEXT_PUBLIC_API_URL ||
-          "http://localhost:3001";
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
         const apiUrl = rawApiUrl
           .replace(/\/+$/, "")
@@ -56,9 +53,7 @@ export default function ProdutosMaisVendidos() {
         );
 
         if (!response.ok) {
-          throw new Error(
-            "Erro ao carregar produtos mais vendidos."
-          );
+          throw new Error("Erro ao carregar produtos mais vendidos.");
         }
 
         const data = await response.json();
@@ -89,7 +84,13 @@ export default function ProdutosMaisVendidos() {
   // ========================================
 
   function formatarPreco(valor: string | number) {
-    return Number(valor).toLocaleString("pt-BR", {
+    const numero = Number(valor);
+
+    if (!Number.isFinite(numero)) {
+      return "R$ 0,00";
+    }
+
+    return numero.toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
     });
@@ -103,19 +104,21 @@ export default function ProdutosMaisVendidos() {
     preco: string | number,
     precoPromo?: string | number | null
   ) {
+    const precoNormal = Number(preco);
+    const precoPromocional = Number(precoPromo);
+
     if (
-      precoPromo === null ||
-      precoPromo === undefined ||
-      Number(precoPromo) <= 0 ||
-      Number(precoPromo) >= Number(preco)
+      !Number.isFinite(precoNormal) ||
+      !Number.isFinite(precoPromocional) ||
+      precoNormal <= 0 ||
+      precoPromocional <= 0 ||
+      precoPromocional >= precoNormal
     ) {
       return 0;
     }
 
     return Math.round(
-      ((Number(preco) - Number(precoPromo)) /
-        Number(preco)) *
-        100
+      ((precoNormal - precoPromocional) / precoNormal) * 100
     );
   }
 
@@ -255,16 +258,24 @@ export default function ProdutosMaisVendidos() {
           {produtos.map((produto, index) => {
             const posicao = index + 1;
 
-            const temPromocao =
+            const precoNormal = Number(produto.preco);
+
+            const precoPromocional =
               produto.precoPromo !== null &&
-              produto.precoPromo !== undefined &&
-              Number(produto.precoPromo) > 0 &&
-              Number(produto.precoPromo) <
-                Number(produto.preco);
+              produto.precoPromo !== undefined
+                ? Number(produto.precoPromo)
+                : 0;
+
+            const temPromocao =
+              Number.isFinite(precoNormal) &&
+              precoNormal > 0 &&
+              Number.isFinite(precoPromocional) &&
+              precoPromocional > 0 &&
+              precoPromocional < precoNormal;
 
             const precoAtual = temPromocao
-              ? Number(produto.precoPromo)
-              : Number(produto.preco);
+              ? precoPromocional
+              : precoNormal;
 
             const desconto = calcularDesconto(
               produto.preco,
@@ -297,7 +308,7 @@ export default function ProdutosMaisVendidos() {
                 </div>
 
                 {/* ========================================
-                    SELO
+                    SELO MAIS VENDIDO
                 ======================================== */}
 
                 <div className="absolute right-4 top-4 z-20">
@@ -321,7 +332,7 @@ export default function ProdutosMaisVendidos() {
                           produto.imagem ?? undefined
                         ) ?? undefined
                       }
-                      alt={produto.nome}
+                      alt={`${produto.nome} - produto para cães e gatos`}
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                       loading="lazy"
                     />
@@ -355,9 +366,7 @@ export default function ProdutosMaisVendidos() {
 
                   {/* Nome */}
 
-                  <Link
-                    href={`/produtos/${produto.id}`}
-                  >
+                  <Link href={`/produtos/${produto.id}`}>
                     <h3 className="line-clamp-2 min-h-[52px] text-lg font-semibold leading-7 text-[#2d2a26] transition-colors duration-200 hover:text-[#c96d53]">
                       {produto.nome}
                     </h3>
@@ -430,12 +439,16 @@ export default function ProdutosMaisVendidos() {
                         produto={{
                           id: produto.id,
                           nome: produto.nome,
+                          descricao: produto.descricao,
                           preco: produto.preco,
                           precoPromo: produto.precoPromo,
                           imagem: produto.imagem,
                           estoque: produto.estoque,
                           ativo: produto.ativo,
                           destaque: produto.destaque,
+                          oferta: produto.oferta,
+                          categoriaId: produto.categoriaId,
+                          categoria: produto.categoria,
                         }}
                       />
                     ) : (
