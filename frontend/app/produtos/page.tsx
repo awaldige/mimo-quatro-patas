@@ -1,7 +1,9 @@
-
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import ProdutosClient from "./ProdutosClient";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Produtos para Cães e Gatos | Mimo Quatro Patas",
@@ -25,11 +27,36 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Produtos para Cães e Gatos | Mimo Quatro Patas",
     description:
-      "Confira produtos e acessórios especiais para cães e gatos na Mimo Quatro Patas.",
+      "Confira produtos para cães e gatos na Mimo Quatro Patas.",
   },
 };
 
-export default function ProdutosPage() {
-  return <ProdutosClient />;
+function ProdutosLoading() {
+  return (
+    <main className="min-h-screen bg-[#fffaf5] px-6 py-10">
+      <div className="mx-auto max-w-7xl">
+        <div className="rounded-3xl border border-[#eadfd6] bg-white px-6 py-16 text-center shadow-sm">
+          <div
+            className="text-5xl"
+            role="img"
+            aria-label="Patinha de animal"
+          >
+            🐾
+          </div>
+
+          <p className="mt-4 font-semibold text-[#756f69]">
+            Carregando produtos...
+          </p>
+        </div>
+      </div>
+    </main>
+  );
 }
 
+export default function ProdutosPage() {
+  return (
+    <Suspense fallback={<ProdutosLoading />}>
+      <ProdutosClient />
+    </Suspense>
+  );
+}
