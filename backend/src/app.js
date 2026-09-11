@@ -20,12 +20,38 @@ const app = express();
 // CORS
 // =====================================================
 
+const origensPermitidas = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "https://mimo-quatro-patas.vercel.app",
+];
+
 app.use(
   cors({
-    origin: [
-      "http://localhost:3000",
-      "http://127.0.0.1:3000",
+    origin: function (origin, callback) {
+      // Permite requisições sem Origin, como testes diretos,
+      // ferramentas do backend e algumas requisições do servidor.
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (origensPermitidas.includes(origin)) {
+        return callback(null, true);
+      }
+
+      console.warn("Origem bloqueada pelo CORS:", origin);
+
+      return callback(
+        new Error("Origem não autorizada pelo CORS.")
+      );
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept",
     ],
+    credentials: false,
   })
 );
 
@@ -116,6 +142,32 @@ app.get("/api/status", async (req, res) => {
       database: "disconnected",
     });
   }
+});
+
+// =====================================================
+// TRATAMENTO DE ERROS
+// =====================================================
+
+app.use((error, req, res, next) => {
+  console.error(
+    "Erro na API:",
+    error
+  );
+
+  if (
+    error.message ===
+    "Origem não autorizada pelo CORS."
+  ) {
+    return res.status(403).json({
+      success: false,
+      message: "Origem não autorizada.",
+    });
+  }
+
+  return res.status(500).json({
+    success: false,
+    message: "Erro interno do servidor.",
+  });
 });
 
 // =====================================================
