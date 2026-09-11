@@ -1,7 +1,8 @@
-
 import type { MetadataRoute } from "next";
 
 import { getProdutos } from "@/services/api";
+
+export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const dataAtual = new Date();
@@ -58,4 +59,3 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return paginasPrincipais;
   }
 }
-

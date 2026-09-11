@@ -1,10 +1,39 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import {
   getCategorias,
-  Categoria,
+  type Categoria,
   getImagemUrl,
 } from "@/services/api";
+
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Categorias | Mimo Quatro Patas",
+  description:
+    "Explore as categorias da Mimo Quatro Patas e encontre produtos especiais para cães, gatos e outros pets.",
+  keywords: [
+    "categorias pet",
+    "produtos para cães",
+    "produtos para gatos",
+    "acessórios para pets",
+    "loja pet",
+    "Mimo Quatro Patas",
+  ],
+  openGraph: {
+    title: "Categorias | Mimo Quatro Patas",
+    description:
+      "Explore nossas categorias e encontre produtos especiais para o seu pet.",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Categorias | Mimo Quatro Patas",
+    description:
+      "Explore nossas categorias e encontre produtos especiais para o seu pet.",
+  },
+};
 
 function obterEmoji(nome: string) {
   const nomeNormalizado = nome
@@ -93,10 +122,7 @@ export default async function CategoriasPage() {
   return (
     <main className="min-h-screen bg-[#fffaf5] px-6 py-12 md:py-16">
       <div className="mx-auto max-w-7xl">
-
-        {/* =====================================================
-            VOLTAR
-        ===================================================== */}
+        {/* VOLTAR */}
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-sm font-semibold text-[#e58b6f] transition hover:text-[#c96d53] focus:outline-none focus:ring-2 focus:ring-[#e58b6f] focus:ring-offset-2"
@@ -104,9 +130,7 @@ export default async function CategoriasPage() {
           ← Voltar para a página inicial
         </Link>
 
-        {/* =====================================================
-            CABEÇALHO
-        ===================================================== */}
+        {/* CABEÇALHO */}
         <div className="mx-auto mt-10 max-w-2xl text-center">
           <span className="text-sm font-semibold uppercase tracking-[0.2em] text-[#e58b6f]">
             Explore nossa loja
@@ -122,9 +146,7 @@ export default async function CategoriasPage() {
           </p>
         </div>
 
-        {/* =====================================================
-            CATEGORIAS
-        ===================================================== */}
+        {/* CATEGORIAS */}
         {categoriasAtivas.length === 0 ? (
           <div className="mt-12 rounded-3xl border border-[#eadfd6] bg-white px-6 py-16 text-center shadow-sm">
             <div
@@ -164,14 +186,10 @@ export default async function CategoriasPage() {
                   aria-label={`Ver produtos da categoria ${categoria.nome}`}
                   className="group relative overflow-hidden rounded-[2rem] border border-[#eadfd6] bg-white p-6 text-center shadow-sm transition duration-300 hover:-translate-y-1 hover:border-[#e58b6f]/40 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#e58b6f] focus:ring-offset-2"
                 >
-                  {/* =================================================
-                      DECORAÇÃO
-                  ================================================= */}
+                  {/* DECORAÇÃO */}
                   <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#f6c85f]/10 transition duration-500 group-hover:scale-150" />
 
-                  {/* =================================================
-                      IMAGEM DA CATEGORIA
-                  ================================================= */}
+                  {/* IMAGEM DA CATEGORIA */}
                   <div className="relative mx-auto aspect-square w-full overflow-hidden rounded-3xl bg-[#fff7ed]">
                     {imagemUrl ? (
                       <img
@@ -191,16 +209,12 @@ export default async function CategoriasPage() {
                     )}
                   </div>
 
-                  {/* =================================================
-                      NOME
-                  ================================================= */}
+                  {/* NOME */}
                   <h2 className="relative mt-6 text-xl font-bold text-[#2d2a26]">
                     {categoria.nome}
                   </h2>
 
-                  {/* =================================================
-                      DESCRIÇÃO
-                  ================================================= */}
+                  {/* DESCRIÇÃO */}
                   {categoria.descricao ? (
                     <p className="relative mt-3 line-clamp-3 min-h-[72px] leading-7 text-[#756f69]">
                       {categoria.descricao}
@@ -211,9 +225,7 @@ export default async function CategoriasPage() {
                     </p>
                   )}
 
-                  {/* =================================================
-                      AÇÃO
-                  ================================================= */}
+                  {/* AÇÃO */}
                   <span className="relative mt-5 inline-flex items-center gap-2 font-semibold text-[#e58b6f] transition group-hover:gap-3 group-hover:text-[#c96d53]">
                     Ver produtos
                     <span aria-hidden="true">→</span>

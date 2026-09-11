@@ -1,7 +1,41 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
-import { getProdutos, Produto } from "@/services/api";
+import {
+  getProdutos,
+  type Produto,
+  getImagemUrl,
+} from "@/services/api";
+
 import AdicionarAoCarrinho from "@/components/AdicionarAoCarrinho";
+
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Ofertas Especiais | Mimo Quatro Patas",
+  description:
+    "Confira as ofertas especiais da Mimo Quatro Patas e encontre produtos para cães e gatos com preços promocionais.",
+  keywords: [
+    "ofertas pet",
+    "promoção pet",
+    "produtos para cães em promoção",
+    "produtos para gatos em promoção",
+    "ofertas para pets",
+    "Mimo Quatro Patas",
+  ],
+  openGraph: {
+    title: "Ofertas Especiais | Mimo Quatro Patas",
+    description:
+      "Confira produtos para cães e gatos com preços especiais na Mimo Quatro Patas.",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Ofertas Especiais | Mimo Quatro Patas",
+    description:
+      "Confira produtos para cães e gatos com preços especiais na Mimo Quatro Patas.",
+  },
+};
 
 function formatarPreco(valor: string | number) {
   return Number(valor).toLocaleString("pt-BR", {
@@ -43,11 +77,7 @@ export default async function OfertasPage() {
       const preco = Number(produto.preco);
       const precoPromo = Number(produto.precoPromo);
 
-      return (
-        preco > 0 &&
-        precoPromo > 0 &&
-        precoPromo < preco
-      );
+      return preco > 0 && precoPromo > 0 && precoPromo < preco;
     })
     .sort((a, b) => {
       const descontoA = calcularDesconto(
@@ -66,12 +96,11 @@ export default async function OfertasPage() {
   return (
     <main className="min-h-screen bg-[#fffaf5] px-6 py-12 md:py-16">
       <div className="mx-auto max-w-7xl">
-
-        {/* Voltar */}
+        {/* VOLTAR */}
         <div className="text-center">
           <Link
             href="/"
-            className="text-sm font-semibold text-[#e58b6f] transition hover:text-[#c96d53]"
+            className="text-sm font-semibold text-[#e58b6f] transition hover:text-[#c96d53] focus:outline-none focus:ring-2 focus:ring-[#e58b6f] focus:ring-offset-2"
           >
             ← Voltar para a página inicial
           </Link>
@@ -90,7 +119,7 @@ export default async function OfertasPage() {
           </p>
         </div>
 
-        {/* Ofertas */}
+        {/* OFERTAS */}
         {ofertas.length === 0 ? (
           <div className="mt-12 rounded-3xl border border-[#eadfd6] bg-white px-6 py-16 text-center shadow-sm">
             <div
@@ -112,7 +141,7 @@ export default async function OfertasPage() {
 
             <Link
               href="/produtos"
-              className="mt-8 inline-flex rounded-full bg-[#e58b6f] px-6 py-3 font-semibold text-white transition hover:bg-[#c96d53]"
+              className="mt-8 inline-flex rounded-full bg-[#e58b6f] px-6 py-3 font-semibold text-white transition hover:bg-[#c96d53] focus:outline-none focus:ring-2 focus:ring-[#e58b6f] focus:ring-offset-2"
             >
               Ver todos os produtos
             </Link>
@@ -128,24 +157,27 @@ export default async function OfertasPage() {
                 precoAtual
               );
 
+              const imagemUrl = produto.imagem
+                ? getImagemUrl(produto.imagem)
+                : null;
+
               return (
                 <article
                   key={produto.id}
                   className="group flex h-full flex-col overflow-hidden rounded-[2rem] border border-[#eadfd6] bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl"
                 >
-                  {/* Imagem */}
-                  <div className="relative h-64 overflow-hidden bg-[#fff4ec]">
-                    {produto.imagem ? (
+                  {/* IMAGEM */}
+                  <div className="relative aspect-square overflow-hidden bg-[#fff4ec]">
+                    {imagemUrl ? (
                       <img
-                        src={produto.imagem}
-                        alt={produto.nome}
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        src={imagemUrl}
+                        alt={`${produto.nome} - oferta`}
+                        className="h-full w-full object-contain transition duration-500 group-hover:scale-105"
+                        loading="lazy"
                       />
                     ) : (
                       <div className="flex h-full flex-col items-center justify-center">
-                        <span className="text-7xl">
-                          🐾
-                        </span>
+                        <span className="text-7xl">🐾</span>
 
                         <span className="mt-3 text-sm text-[#756f69]">
                           Foto em breve
@@ -153,18 +185,18 @@ export default async function OfertasPage() {
                       </div>
                     )}
 
-                    {/* Desconto */}
+                    {/* DESCONTO */}
                     <span className="absolute left-4 top-4 rounded-full bg-[#e58b6f] px-4 py-2 text-xs font-bold text-white shadow-sm">
                       -{percentualDesconto}%
                     </span>
 
-                    {/* Oferta */}
+                    {/* OFERTA */}
                     <span className="absolute right-4 top-4 rounded-full bg-white/95 px-4 py-2 text-xs font-bold text-[#e58b6f] shadow-sm">
                       🔥 Oferta
                     </span>
                   </div>
 
-                  {/* Informações */}
+                  {/* INFORMAÇÕES */}
                   <div className="flex flex-1 flex-col p-6">
                     {produto.categoria && (
                       <span className="text-xs font-bold uppercase tracking-wider text-[#e58b6f]">
@@ -182,7 +214,7 @@ export default async function OfertasPage() {
                       </p>
                     )}
 
-                    {/* Preços */}
+                    {/* PREÇOS */}
                     <div className="mt-5">
                       <span className="text-sm text-gray-400 line-through">
                         {formatarPreco(precoOriginal)}
@@ -193,7 +225,7 @@ export default async function OfertasPage() {
                       </strong>
                     </div>
 
-                    {/* Estoque */}
+                    {/* ESTOQUE */}
                     <div className="mt-4">
                       {produto.estoque <= 0 ? (
                         <span className="text-sm font-semibold text-red-500">
@@ -210,15 +242,15 @@ export default async function OfertasPage() {
                       )}
                     </div>
 
-                    {/* Detalhes */}
+                    {/* DETALHES */}
                     <Link
                       href={`/produtos/${produto.id}`}
-                      className="mt-5 block w-full rounded-full border-2 border-[#e58b6f] px-5 py-3 text-center font-semibold text-[#e58b6f] transition hover:bg-[#fff4ec]"
+                      className="mt-5 block w-full rounded-full border-2 border-[#e58b6f] px-5 py-3 text-center font-semibold text-[#e58b6f] transition hover:bg-[#fff4ec] focus:outline-none focus:ring-2 focus:ring-[#e58b6f] focus:ring-offset-2"
                     >
                       Ver detalhes
                     </Link>
 
-                    {/* Carrinho */}
+                    {/* CARRINHO */}
                     <AdicionarAoCarrinho produto={produto} />
                   </div>
                 </article>
