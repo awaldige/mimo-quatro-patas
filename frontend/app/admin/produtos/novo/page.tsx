@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -9,9 +8,11 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:3001/api";
+const API_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+)
+  .replace(/\/+$/, "")
+  .replace(/\/api$/, "");
 
 interface Categoria {
   id: number;
@@ -70,6 +71,22 @@ function extrairArray<T>(
   return [];
 }
 
+async function lerResposta(response: Response) {
+  const texto = await response.text();
+
+  if (!texto) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(texto);
+  } catch {
+    throw new Error(
+      `A API retornou uma resposta inválida. Status: ${response.status} ${response.statusText}`
+    );
+  }
+}
+
 export default function NovoProdutoPage() {
   const router = useRouter();
 
@@ -119,38 +136,59 @@ export default function NovoProdutoPage() {
         setCarregandoDados(true);
         setErro("");
 
+        const categoriasUrl =
+          `${API_URL}/api/categorias`;
+
+        const fornecedoresUrl =
+          `${API_URL}/api/fornecedores`;
+
+        console.log(
+          "[Admin Novo Produto] API:",
+          API_URL
+        );
+
+        console.log(
+          "[Admin Novo Produto] Categorias:",
+          categoriasUrl
+        );
+
+        console.log(
+          "[Admin Novo Produto] Fornecedores:",
+          fornecedoresUrl
+        );
+
         const [
           categoriasResponse,
           fornecedoresResponse,
         ] = await Promise.all([
-          fetch(`${API_URL}/categorias`, {
+          fetch(categoriasUrl, {
             cache: "no-store",
           }),
 
-          fetch(`${API_URL}/fornecedores`, {
+          fetch(fornecedoresUrl, {
             cache: "no-store",
           }),
         ]);
 
         const categoriasData =
-          categoriasResponse.ok
-            ? await categoriasResponse.json()
-            : [];
+          await lerResposta(categoriasResponse);
 
         const fornecedoresData =
-          fornecedoresResponse.ok
-            ? await fornecedoresResponse.json()
-            : [];
+          await lerResposta(fornecedoresResponse);
 
         if (!categoriasResponse.ok) {
           throw new Error(
-            "Não foi possível carregar as categorias."
+            categoriasData?.message ||
+              categoriasData?.erro ||
+              "Não foi possível carregar as categorias."
           );
         }
 
         if (!fornecedoresResponse.ok) {
           throw new Error(
-            "Não foi possível carregar os fornecedores."
+            fornecedoresData?.message ||
+              fornecedoresData?.erro ||
+              "Não foi possível carregar os fornecedores."
           );
         }
 
@@ -166,9 +204,19 @@ export default function NovoProdutoPage() {
             ["fornecedores"]
           );
 
-        setCategorias(categoriasCarregadas);
+        setCategorias(
+          categoriasCarregadas.filter(
+            (categoria) =>
+              categoria.ativo !== false
+          )
+        );
 
-        setFornecedores(fornecedoresCarregados);
+        setFornecedores(
+          fornecedoresCarregados.filter(
+            (fornecedor) =>
+              fornecedor.ativo !== false
+          )
+        );
       } catch (error) {
         console.error(
           "[Admin Novo Produto] Erro ao carregar dados:",
@@ -187,6 +235,14 @@ export default function NovoProdutoPage() {
 
     carregarDados();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (previewImagem) {
+        URL.revokeObjectURL(previewImagem);
+      }
+    };
+  }, [previewImagem]);
 
   function atualizarCampo(
     campo: keyof FormularioProduto,
@@ -241,23 +297,25 @@ export default function NovoProdutoPage() {
 
     setNovaImagem(arquivo);
 
-    if (previewImagem) {
-      URL.revokeObjectURL(previewImagem);
-    }
+    setPreviewImagem((imagemAnterior) => {
+      if (imagemAnterior) {
+        URL.revokeObjectURL(imagemAnterior);
+      }
 
-    const url = URL.createObjectURL(arquivo);
-
-    setPreviewImagem(url);
+      return URL.createObjectURL(arquivo);
+    });
   }
 
   function removerImagem() {
-    if (previewImagem) {
-      URL.revokeObjectURL(previewImagem);
-    }
-
     setNovaImagem(null);
 
-    setPreviewImagem(null);
+    setPreviewImagem((imagemAnterior) => {
+      if (imagemAnterior) {
+        URL.revokeObjectURL(imagemAnterior);
+      }
+
+      return null;
+    });
   }
 
   async function salvarProduto(
@@ -270,23 +328,22 @@ export default function NovoProdutoPage() {
       setErro("");
       setMensagem("");
 
-      const nome = formulario.nome.trim();
+      const nome =
+        formulario.nome.trim();
 
       const descricao =
         formulario.descricao.trim();
 
-      const preco = Number(
-        formulario.preco
-      );
+      const preco =
+        Number(formulario.preco);
 
       const precoPromo =
         formulario.precoPromo.trim()
           ? Number(formulario.precoPromo)
           : null;
 
-      const estoque = Number(
-        formulario.estoque
-      );
+      const estoque =
+        Number(formulario.estoque);
 
       if (!nome) {
         throw new Error(
@@ -297,6 +354,7 @@ export default function NovoProdutoPage() {
       if (
         !formulario.preco.trim() ||
         Number.isNaN(preco) ||
+        !Number.isFinite(preco) ||
         preco <= 0
       ) {
         throw new Error(
@@ -306,8 +364,11 @@ export default function NovoProdutoPage() {
 
       if (
         precoPromo !== null &&
-        (Number.isNaN(precoPromo) ||
-          precoPromo <= 0)
+        (
+          Number.isNaN(precoPromo) ||
+          !Number.isFinite(precoPromo) ||
+          precoPromo <= 0
+        )
       ) {
         throw new Error(
           "Informe um preço promocional válido."
@@ -326,10 +387,19 @@ export default function NovoProdutoPage() {
       if (
         formulario.estoque.trim() === "" ||
         Number.isNaN(estoque) ||
+        !Number.isFinite(estoque) ||
         estoque < 0
       ) {
         throw new Error(
           "Informe um estoque válido."
+        );
+      }
+
+      if (
+        !Number.isInteger(estoque)
+      ) {
+        throw new Error(
+          "O estoque deve ser informado como um número inteiro."
         );
       }
 
@@ -339,15 +409,53 @@ export default function NovoProdutoPage() {
         );
       }
 
-      if (
-        formulario.custoFornecedor.trim() &&
-        Number.isNaN(
-          Number(formulario.custoFornecedor)
-        )
-      ) {
-        throw new Error(
-          "Informe um custo de fornecedor válido."
+      const categoriaExiste =
+        categorias.some(
+          (categoria) =>
+            String(categoria.id) ===
+            formulario.categoriaId
         );
+
+      if (!categoriaExiste) {
+        throw new Error(
+          "A categoria selecionada não é válida."
+        );
+      }
+
+      if (
+        formulario.fornecedorId
+      ) {
+        const fornecedorExiste =
+          fornecedores.some(
+            (fornecedor) =>
+              String(fornecedor.id) ===
+              formulario.fornecedorId
+          );
+
+        if (!fornecedorExiste) {
+          throw new Error(
+            "O fornecedor selecionado não é válido."
+          );
+        }
+      }
+
+      if (
+        formulario.custoFornecedor.trim()
+      ) {
+        const custoFornecedor =
+          Number(
+            formulario.custoFornecedor
+          );
+
+        if (
+          Number.isNaN(custoFornecedor) ||
+          !Number.isFinite(custoFornecedor) ||
+          custoFornecedor < 0
+        ) {
+          throw new Error(
+            "Informe um custo de fornecedor válido."
+          );
+        }
       }
 
       if (
@@ -364,9 +472,13 @@ export default function NovoProdutoPage() {
         }
       }
 
-      const dados = new FormData();
+      const dados =
+        new FormData();
 
-      dados.append("nome", nome);
+      dados.append(
+        "nome",
+        nome
+      );
 
       dados.append(
         "descricao",
@@ -461,24 +573,34 @@ export default function NovoProdutoPage() {
         );
       }
 
-      const response = await fetch(
-        `${API_URL}/produtos`,
-        {
-          method: "POST",
-          body: dados,
-        }
+      const url =
+        `${API_URL}/api/produtos`;
+
+      console.log(
+        "[Admin Novo Produto] Cadastrando produto em:",
+        url
       );
 
+      const response =
+        await fetch(
+          url,
+          {
+            method: "POST",
+            body: dados,
+          }
+        );
+
       const resultado =
-        await response
-          .json()
-          .catch(() => null);
+        await lerResposta(
+          response
+        );
 
       if (!response.ok) {
         throw new Error(
           resultado?.message ||
             resultado?.erro ||
-            "Não foi possível cadastrar o produto."
+            resultado?.error ||
+            `Não foi possível cadastrar o produto. Status: ${response.status}`
         );
       }
 
@@ -486,8 +608,29 @@ export default function NovoProdutoPage() {
         "Produto cadastrado com sucesso."
       );
 
+      setFormulario({
+        nome: "",
+        descricao: "",
+        preco: "",
+        precoPromo: "",
+        estoque: "",
+        categoriaId: "",
+        fornecedorId: "",
+        skuFornecedor: "",
+        custoFornecedor: "",
+        linkFornecedor: "",
+        destaque: false,
+        oferta: false,
+        ativo: true,
+      });
+
+      removerImagem();
+
       setTimeout(() => {
-        router.push("/admin/produtos");
+        router.push(
+          "/admin/produtos"
+        );
+
         router.refresh();
       }, 800);
     } catch (error) {
@@ -524,11 +667,15 @@ export default function NovoProdutoPage() {
     );
   }
 
-  if (erro && categorias.length === 0) {
+  if (
+    erro &&
+    categorias.length === 0
+  ) {
     return (
       <main className="min-h-screen bg-gray-50 p-4 md:p-6">
         <div className="mx-auto max-w-6xl">
           <div className="rounded-xl bg-white p-8 shadow-sm">
+
             <div className="mb-6 rounded-lg bg-red-50 p-4 text-red-700">
               {erro}
             </div>
@@ -544,6 +691,7 @@ export default function NovoProdutoPage() {
             >
               Voltar para produtos
             </button>
+
           </div>
         </div>
       </main>
@@ -557,7 +705,9 @@ export default function NovoProdutoPage() {
         {/* Cabeçalho */}
 
         <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+
           <div>
+
             <button
               type="button"
               onClick={() =>
@@ -578,11 +728,13 @@ export default function NovoProdutoPage() {
               Cadastre um novo produto na
               Mimo Quatro Patas.
             </p>
+
           </div>
 
           <span className="inline-flex w-fit rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">
             Novo cadastro
           </span>
+
         </div>
 
         {/* Mensagens */}
@@ -611,6 +763,7 @@ export default function NovoProdutoPage() {
               {/* Informações */}
 
               <section className="rounded-xl bg-white p-6 shadow-sm">
+
                 <h2 className="mb-5 text-lg font-semibold text-gray-900">
                   Informações do produto
                 </h2>
@@ -618,13 +771,16 @@ export default function NovoProdutoPage() {
                 <div className="space-y-5">
 
                   <div>
+
                     <label className="mb-2 block text-sm font-medium text-gray-700">
                       Nome do produto *
                     </label>
 
                     <input
                       type="text"
-                      value={formulario.nome}
+                      value={
+                        formulario.nome
+                      }
                       onChange={(event) =>
                         atualizarCampo(
                           "nome",
@@ -635,9 +791,11 @@ export default function NovoProdutoPage() {
                       placeholder="Ex.: Cama Confortável para Cachorros"
                       required
                     />
+
                   </div>
 
                   <div>
+
                     <label className="mb-2 block text-sm font-medium text-gray-700">
                       Descrição
                     </label>
@@ -656,14 +814,17 @@ export default function NovoProdutoPage() {
                       className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-900"
                       placeholder="Descreva as principais características do produto..."
                     />
+
                   </div>
 
                 </div>
+
               </section>
 
               {/* Preços */}
 
               <section className="rounded-xl bg-white p-6 shadow-sm">
+
                 <h2 className="mb-5 text-lg font-semibold text-gray-900">
                   Preço e estoque
                 </h2>
@@ -671,6 +832,7 @@ export default function NovoProdutoPage() {
                 <div className="grid gap-5 md:grid-cols-3">
 
                   <div>
+
                     <label className="mb-2 block text-sm font-medium text-gray-700">
                       Preço *
                     </label>
@@ -692,9 +854,11 @@ export default function NovoProdutoPage() {
                       placeholder="89.90"
                       required
                     />
+
                   </div>
 
                   <div>
+
                     <label className="mb-2 block text-sm font-medium text-gray-700">
                       Preço promocional
                     </label>
@@ -719,9 +883,11 @@ export default function NovoProdutoPage() {
                     <p className="mt-1 text-xs text-gray-500">
                       Opcional. Deve ser menor que o preço.
                     </p>
+
                   </div>
 
                   <div>
+
                     <label className="mb-2 block text-sm font-medium text-gray-700">
                       Estoque *
                     </label>
@@ -729,6 +895,7 @@ export default function NovoProdutoPage() {
                     <input
                       type="number"
                       min="0"
+                      step="1"
                       value={
                         formulario.estoque
                       }
@@ -742,14 +909,17 @@ export default function NovoProdutoPage() {
                       placeholder="20"
                       required
                     />
+
                   </div>
 
                 </div>
+
               </section>
 
               {/* Categoria */}
 
               <section className="rounded-xl bg-white p-6 shadow-sm">
+
                 <h2 className="mb-5 text-lg font-semibold text-gray-900">
                   Categoria
                 </h2>
@@ -771,6 +941,7 @@ export default function NovoProdutoPage() {
                   className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-gray-900"
                   required
                 >
+
                   <option value="">
                     Selecione uma categoria
                   </option>
@@ -778,13 +949,18 @@ export default function NovoProdutoPage() {
                   {categorias.map(
                     (categoria) => (
                       <option
-                        key={categoria.id}
-                        value={categoria.id}
+                        key={
+                          categoria.id
+                        }
+                        value={
+                          categoria.id
+                        }
                       >
                         {categoria.nome}
                       </option>
                     )
                   )}
+
                 </select>
 
                 {categorias.length === 0 && (
@@ -792,6 +968,7 @@ export default function NovoProdutoPage() {
                     Nenhuma categoria cadastrada.
                   </p>
                 )}
+
               </section>
 
               {/* Dropshipping */}
@@ -799,6 +976,7 @@ export default function NovoProdutoPage() {
               <section className="rounded-xl bg-white p-6 shadow-sm">
 
                 <div className="mb-5">
+
                   <h2 className="text-lg font-semibold text-gray-900">
                     Dropshipping
                   </h2>
@@ -808,11 +986,13 @@ export default function NovoProdutoPage() {
                     encaminhamento dos pedidos ao
                     fornecedor.
                   </p>
+
                 </div>
 
                 <div className="space-y-5">
 
                   <div>
+
                     <label className="mb-2 block text-sm font-medium text-gray-700">
                       Fornecedor
                     </label>
@@ -829,6 +1009,7 @@ export default function NovoProdutoPage() {
                       }
                       className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-gray-900"
                     >
+
                       <option value="">
                         Sem fornecedor
                       </option>
@@ -836,7 +1017,9 @@ export default function NovoProdutoPage() {
                       {fornecedores.map(
                         (fornecedor) => (
                           <option
-                            key={fornecedor.id}
+                            key={
+                              fornecedor.id
+                            }
                             value={
                               fornecedor.id
                             }
@@ -849,12 +1032,15 @@ export default function NovoProdutoPage() {
                           </option>
                         )
                       )}
+
                     </select>
+
                   </div>
 
                   <div className="grid gap-5 md:grid-cols-2">
 
                     <div>
+
                       <label className="mb-2 block text-sm font-medium text-gray-700">
                         SKU do fornecedor
                       </label>
@@ -873,9 +1059,11 @@ export default function NovoProdutoPage() {
                         className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-900"
                         placeholder="SKU-001"
                       />
+
                     </div>
 
                     <div>
+
                       <label className="mb-2 block text-sm font-medium text-gray-700">
                         Custo do fornecedor
                       </label>
@@ -896,11 +1084,13 @@ export default function NovoProdutoPage() {
                         className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-900"
                         placeholder="45.00"
                       />
+
                     </div>
 
                   </div>
 
                   <div>
+
                     <label className="mb-2 block text-sm font-medium text-gray-700">
                       Link do fornecedor
                     </label>
@@ -923,9 +1113,11 @@ export default function NovoProdutoPage() {
                     <p className="mt-1 text-xs text-gray-500">
                       Link interno para localizar o produto no fornecedor.
                     </p>
+
                   </div>
 
                 </div>
+
               </section>
 
               {/* Configurações */}
@@ -939,6 +1131,7 @@ export default function NovoProdutoPage() {
                 <div className="space-y-4">
 
                   <label className="flex cursor-pointer items-start gap-3">
+
                     <input
                       type="checkbox"
                       checked={
@@ -954,6 +1147,7 @@ export default function NovoProdutoPage() {
                     />
 
                     <span>
+
                       <span className="block text-sm font-medium text-gray-900">
                         Produto em destaque
                       </span>
@@ -961,10 +1155,13 @@ export default function NovoProdutoPage() {
                       <span className="block text-xs text-gray-500">
                         Exibe o produto nas áreas de destaque da loja.
                       </span>
+
                     </span>
+
                   </label>
 
                   <label className="flex cursor-pointer items-start gap-3">
+
                     <input
                       type="checkbox"
                       checked={
@@ -980,6 +1177,7 @@ export default function NovoProdutoPage() {
                     />
 
                     <span>
+
                       <span className="block text-sm font-medium text-gray-900">
                         Produto em oferta
                       </span>
@@ -987,10 +1185,13 @@ export default function NovoProdutoPage() {
                       <span className="block text-xs text-gray-500">
                         Marca o produto como uma oferta especial.
                       </span>
+
                     </span>
+
                   </label>
 
                   <label className="flex cursor-pointer items-start gap-3">
+
                     <input
                       type="checkbox"
                       checked={
@@ -1006,6 +1207,7 @@ export default function NovoProdutoPage() {
                     />
 
                     <span>
+
                       <span className="block text-sm font-medium text-gray-900">
                         Produto ativo
                       </span>
@@ -1013,10 +1215,13 @@ export default function NovoProdutoPage() {
                       <span className="block text-xs text-gray-500">
                         Produtos inativos não ficam disponíveis na loja.
                       </span>
+
                     </span>
+
                   </label>
 
                 </div>
+
               </section>
 
             </div>
@@ -1037,12 +1242,15 @@ export default function NovoProdutoPage() {
 
                   {previewImagem ? (
                     <img
-                      src={previewImagem}
+                      src={
+                        previewImagem
+                      }
                       alt="Pré-visualização do produto"
                       className="h-64 w-full object-contain"
                     />
                   ) : (
                     <div className="flex h-64 flex-col items-center justify-center text-gray-400">
+
                       <span className="text-5xl">
                         🐾
                       </span>
@@ -1050,6 +1258,7 @@ export default function NovoProdutoPage() {
                       <span className="mt-2 text-sm">
                         Nenhuma imagem selecionada
                       </span>
+
                     </div>
                   )}
 
@@ -1118,18 +1327,27 @@ export default function NovoProdutoPage() {
                 <div className="space-y-4 text-sm">
 
                   <div className="flex justify-between gap-4">
+
                     <span className="text-gray-500">
                       Status
                     </span>
 
-                    <span className="font-medium text-green-600">
+                    <span
+                      className={`font-medium ${
+                        formulario.ativo
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
                       {formulario.ativo
                         ? "Ativo"
                         : "Inativo"}
                     </span>
+
                   </div>
 
                   <div className="flex justify-between gap-4">
+
                     <span className="text-gray-500">
                       Categoria
                     </span>
@@ -1146,9 +1364,11 @@ export default function NovoProdutoPage() {
                           "Selecionada"
                         : "Não selecionada"}
                     </span>
+
                   </div>
 
                   <div className="flex justify-between gap-4">
+
                     <span className="text-gray-500">
                       Fornecedor
                     </span>
@@ -1165,9 +1385,11 @@ export default function NovoProdutoPage() {
                           "Selecionado"
                         : "Sem fornecedor"}
                     </span>
+
                   </div>
 
                   <div className="flex justify-between gap-4">
+
                     <span className="text-gray-500">
                       Estoque
                     </span>
@@ -1176,9 +1398,11 @@ export default function NovoProdutoPage() {
                       {formulario.estoque ||
                         "0"}
                     </span>
+
                   </div>
 
                 </div>
+
               </section>
 
               {/* Ações */}
@@ -1189,7 +1413,10 @@ export default function NovoProdutoPage() {
 
                   <button
                     type="submit"
-                    disabled={salvando}
+                    disabled={
+                      salvando ||
+                      categorias.length === 0
+                    }
                     className="w-full rounded-lg bg-gray-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {salvando
@@ -1204,7 +1431,9 @@ export default function NovoProdutoPage() {
                         "/admin/produtos"
                       )
                     }
-                    disabled={salvando}
+                    disabled={
+                      salvando
+                    }
                     className="w-full rounded-lg border border-gray-300 px-5 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
                   >
                     Cancelar
@@ -1215,10 +1444,11 @@ export default function NovoProdutoPage() {
               </section>
 
             </div>
+
           </div>
         </form>
+
       </div>
     </main>
   );
 }
-

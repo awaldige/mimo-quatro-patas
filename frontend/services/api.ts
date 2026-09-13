@@ -153,12 +153,6 @@ export function converterNumero(
 
 /**
  * Retorna a URL completa de uma imagem.
- *
- * Exemplos:
- * /uploads/produto.jpg
- * http://localhost:3001/uploads/produto.jpg
- * https://mimo-quatro-patas.onrender.com/uploads/produto.jpg
- * /imagem/produto.png
  */
 export function getImagemUrl(
   imagem: string | null | undefined
@@ -274,12 +268,18 @@ export async function getProdutoById(
  * Busca todas as categorias.
  */
 export async function getCategorias(): Promise<Categoria[]> {
-  const response = await fetch(`${API_URL}/api/categorias`, {
+  const url = `${API_URL}/api/categorias`;
+
+  console.log("[API] Buscando categorias:", url);
+
+  const response = await fetch(url, {
     cache: "no-store",
   });
 
   if (!response.ok) {
-    throw new Error("Erro ao buscar categorias.");
+    throw new Error(
+      `Erro ao buscar categorias. Status: ${response.status}`
+    );
   }
 
   const data = await response.json();
@@ -482,7 +482,9 @@ export async function validarCupom(
 
   if (!response.ok) {
     throw new Error(
-      data?.message || data?.error || "Cupom inválido."
+      data?.message ||
+        data?.error ||
+        "Cupom inválido."
     );
   }
 
@@ -516,7 +518,9 @@ export function temPrecoPromocional(
 /**
  * Retorna o preço atual do produto.
  */
-export function getPrecoAtual(produto: Produto): number {
+export function getPrecoAtual(
+  produto: Produto
+): number {
   if (temPrecoPromocional(produto)) {
     return converterNumero(produto.precoPromo);
   }

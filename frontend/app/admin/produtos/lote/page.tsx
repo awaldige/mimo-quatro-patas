@@ -3,8 +3,11 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+const API_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+)
+  .replace(/\/+$/, "")
+  .replace(/\/api$/, "");
 
 type Categoria = {
   id: number;
@@ -16,6 +19,11 @@ type Fornecedor = {
   id: number;
   nome: string;
   ativo?: boolean;
+};
+
+type ProdutoExistente = {
+  id?: number;
+  nome: string;
 };
 
 type ProdutoLote = {
@@ -60,6 +68,44 @@ function criarProdutoVazio(): ProdutoLote {
   };
 }
 
+async function lerResposta(response: Response): Promise<unknown> {
+  const texto = await response.text();
+
+  if (!texto) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(texto);
+  } catch {
+    throw new Error(
+      `A API retornou uma resposta inválida. Status: ${response.status} ${response.statusText}`
+    );
+  }
+}
+
+function obterMensagemErro(data: unknown, mensagemPadrao: string) {
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "message" in data &&
+    typeof data.message === "string"
+  ) {
+    return data.message;
+  }
+
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "error" in data &&
+    typeof data.error === "string"
+  ) {
+    return data.error;
+  }
+
+  return mensagemPadrao;
+}
+
 export default function CadastroProdutosLotePage() {
   const router = useRouter();
 
@@ -88,56 +134,120 @@ export default function CadastroProdutosLotePage() {
       setCarregandoDados(true);
       setErro("");
 
-      const [categoriasResponse, fornecedoresResponse, produtosResponse] =
-        await Promise.all([
-          fetch(`${API_URL}/categorias`),
-          fetch(`${API_URL}/fornecedores`),
-          fetch(`${API_URL}/produtos`),
-        ]);
+      console.log("[Cadastro em lote] API:", API_URL);
+
+      const [
+        categoriasResponse,
+        fornecedoresResponse,
+        produtosResponse,
+      ] = await Promise.all([
+        fetch(`${API_URL}/api/categorias`, {
+          cache: "no-store",
+        }),
+        fetch(`${API_URL}/api/fornecedores`, {
+          cache: "no-store",
+        }),
+        fetch(`${API_URL}/api/produtos`, {
+          cache: "no-store",
+        }),
+      ]);
+
+      const [
+        categoriasData,
+        fornecedoresData,
+        produtosData,
+      ] = await Promise.all([
+        lerResposta(categoriasResponse),
+        lerResposta(fornecedoresResponse),
+        lerResposta(produtosResponse),
+      ]);
 
       if (!categoriasResponse.ok) {
-        throw new Error("Não foi possível carregar as categorias.");
+        throw new Error(
+          obterMensagemErro(
+            categoriasData,
+            "Não foi possível carregar as categorias."
+          )
+        );
       }
 
       if (!fornecedoresResponse.ok) {
-        throw new Error("Não foi possível carregar os fornecedores.");
+        throw new Error(
+          obterMensagemErro(
+            fornecedoresData,
+            "Não foi possível carregar os fornecedores."
+          )
+        );
       }
 
       if (!produtosResponse.ok) {
-        throw new Error("Não foi possível carregar os produtos.");
+        throw new Error(
+          obterMensagemErro(
+            produtosData,
+            "Não foi possível carregar os produtos."
+          )
+        );
       }
 
-      const categoriasData = await categoriasResponse.json();
-      const fornecedoresData = await fornecedoresResponse.json();
-      const produtosData = await produtosResponse.json();
+      const listaCategorias: Categoria[] = Array.isArray(categoriasData)
+        ? categoriasData
+        : typeof categoriasData === "object" &&
+          categoriasData !== null &&
+          "categorias" in categoriasData &&
+          Array.isArray(categoriasData.categorias)
+        ? categoriasData.categorias
+        : [];
+
+      const listaFornecedores: Fornecedor[] = Array.isArray(
+        fornecedoresData
+      )
+        ? fornecedoresData
+        : typeof fornecedoresData === "object" &&
+          fornecedoresData !== null &&
+          "fornecedores" in fornecedoresData &&
+          Array.isArray(fornecedoresData.fornecedores)
+        ? fornecedoresData.fornecedores
+        : [];
+
+      const listaProdutos: ProdutoExistente[] = Array.isArray(
+        produtosData
+      )
+        ? produtosData
+        : typeof produtosData === "object" &&
+          produtosData !== null &&
+          "produtos" in produtosData &&
+          Array.isArray(produtosData.produtos)
+        ? produtosData.produtos
+        : [];
 
       setCategorias(
-        Array.isArray(categoriasData)
-          ? categoriasData.filter(
-              (categoria) => categoria.ativo !== false
-            )
-          : categoriasData.categorias || []
+        listaCategorias.filter(
+          (categoria) => categoria.ativo !== false
+        )
       );
 
       setFornecedores(
-        Array.isArray(fornecedoresData)
-          ? fornecedoresData.filter(
-              (fornecedor) => fornecedor.ativo !== false
-            )
-          : fornecedoresData.fornecedores || []
-      );
-
-      const listaProdutos = Array.isArray(produtosData)
-        ? produtosData
-        : produtosData.produtos || [];
-
-      setProdutosExistentes(
-        listaProdutos.map((produto: { nome: string }) =>
-          produto.nome.trim().toLowerCase()
+        listaFornecedores.filter(
+          (fornecedor) => fornecedor.ativo !== false
         )
       );
+
+      setProdutosExistentes(
+        listaProdutos
+          .filter(
+            (produto) =>
+              produto &&
+              typeof produto.nome === "string"
+          )
+          .map((produto) =>
+            produto.nome.trim().toLowerCase()
+          )
+      );
     } catch (error) {
-      console.error(error);
+      console.error(
+        "[Cadastro em lote] Erro ao carregar dados:",
+        error
+      );
 
       setErro(
         error instanceof Error
@@ -157,6 +267,14 @@ export default function CadastroProdutosLotePage() {
       ...anterior,
       [campo]: valor,
     }));
+
+    if (erro) {
+      setErro("");
+    }
+
+    if (mensagem) {
+      setMensagem("");
+    }
   }
 
   function adicionarProduto(event: FormEvent<HTMLFormElement>) {
@@ -165,13 +283,50 @@ export default function CadastroProdutosLotePage() {
     setErro("");
     setMensagem("");
 
-    if (!produtoAtual.nome.trim()) {
+    const nome = produtoAtual.nome.trim();
+    const preco = Number(produtoAtual.preco);
+    const precoPromo = produtoAtual.precoPromo
+      ? Number(produtoAtual.precoPromo)
+      : 0;
+    const estoque = Number(produtoAtual.estoque);
+    const custoFornecedor = produtoAtual.custoFornecedor
+      ? Number(produtoAtual.custoFornecedor)
+      : 0;
+
+    if (!nome) {
       setErro("Informe o nome do produto.");
       return;
     }
 
-    if (!produtoAtual.preco || Number(produtoAtual.preco) <= 0) {
+    if (!produtoAtual.preco || !Number.isFinite(preco) || preco <= 0) {
       setErro("Informe um preço válido.");
+      return;
+    }
+
+    if (
+      produtoAtual.precoPromo &&
+      (!Number.isFinite(precoPromo) || precoPromo < 0)
+    ) {
+      setErro("Informe um preço promocional válido.");
+      return;
+    }
+
+    if (
+      produtoAtual.precoPromo &&
+      precoPromo >= preco
+    ) {
+      setErro(
+        "O preço promocional deve ser menor que o preço normal."
+      );
+      return;
+    }
+
+    if (
+      !Number.isFinite(estoque) ||
+      estoque < 0 ||
+      !Number.isInteger(estoque)
+    ) {
+      setErro("Informe um estoque válido.");
       return;
     }
 
@@ -180,14 +335,51 @@ export default function CadastroProdutosLotePage() {
       return;
     }
 
-    const nomeNormalizado = produtoAtual.nome.trim().toLowerCase();
+    if (
+      produtoAtual.custoFornecedor &&
+      (!Number.isFinite(custoFornecedor) || custoFornecedor < 0)
+    ) {
+      setErro("Informe um custo de fornecedor válido.");
+      return;
+    }
+
+    const categoriaExiste = categorias.some(
+      (categoria) =>
+        categoria.id === Number(produtoAtual.categoriaId)
+    );
+
+    if (!categoriaExiste) {
+      setErro(
+        "A categoria selecionada não está disponível."
+      );
+      return;
+    }
+
+    if (produtoAtual.fornecedorId) {
+      const fornecedorExiste = fornecedores.some(
+        (fornecedor) =>
+          fornecedor.id === Number(produtoAtual.fornecedorId)
+      );
+
+      if (!fornecedorExiste) {
+        setErro(
+          "O fornecedor selecionado não está disponível."
+        );
+        return;
+      }
+    }
+
+    const nomeNormalizado = nome.toLowerCase();
 
     const jaNoLote = produtos.some(
-      (produto) => produto.nome.trim().toLowerCase() === nomeNormalizado
+      (produto) =>
+        produto.nome.trim().toLowerCase() === nomeNormalizado
     );
 
     if (jaNoLote) {
-      setErro("Este produto já foi adicionado ao lote.");
+      setErro(
+        "Este produto já foi adicionado ao lote."
+      );
       return;
     }
 
@@ -195,8 +387,17 @@ export default function CadastroProdutosLotePage() {
       ...anterior,
       {
         ...produtoAtual,
-        nome: produtoAtual.nome.trim(),
+        nome,
         descricao: produtoAtual.descricao.trim(),
+        preco: produtoAtual.preco.trim(),
+        precoPromo: produtoAtual.precoPromo.trim(),
+        estoque: String(estoque),
+        skuFornecedor:
+          produtoAtual.skuFornecedor.trim(),
+        custoFornecedor:
+          produtoAtual.custoFornecedor.trim(),
+        linkFornecedor:
+          produtoAtual.linkFornecedor.trim(),
       },
     ]);
 
@@ -207,7 +408,9 @@ export default function CadastroProdutosLotePage() {
 
   function removerProduto(id: string) {
     setProdutos((anterior) =>
-      anterior.filter((produto) => produto.id !== id)
+      anterior.filter(
+        (produto) => produto.id !== id
+      )
     );
 
     setMensagem("Produto removido do lote.");
@@ -215,7 +418,9 @@ export default function CadastroProdutosLotePage() {
   }
 
   function editarProduto(id: string) {
-    const produto = produtos.find((item) => item.id === id);
+    const produto = produtos.find(
+      (item) => item.id === id
+    );
 
     if (!produto) {
       return;
@@ -224,8 +429,16 @@ export default function CadastroProdutosLotePage() {
     setProdutoAtual(produto);
 
     setProdutos((anterior) =>
-      anterior.filter((item) => item.id !== id)
+      anterior.filter(
+        (item) => item.id !== id
+      )
     );
+
+    setMensagem(
+      "Produto carregado para edição."
+    );
+
+    setErro("");
 
     window.scrollTo({
       top: 0,
@@ -239,22 +452,70 @@ export default function CadastroProdutosLotePage() {
     setMensagem("");
   }
 
+  function limparLote() {
+    if (cadastrando || produtos.length === 0) {
+      return;
+    }
+
+    setProdutos([]);
+    setResultados([]);
+    setErro("");
+    setMensagem("Lote limpo.");
+  }
+
   const produtosDuplicados = useMemo(() => {
     return produtos.filter((produto) =>
-      produtosExistentes.includes(produto.nome.trim().toLowerCase())
+      produtosExistentes.includes(
+        produto.nome.trim().toLowerCase()
+      )
     );
   }, [produtos, produtosExistentes]);
 
   const produtosPendentes = useMemo(() => {
     return produtos.filter(
       (produto) =>
-        !produtosExistentes.includes(produto.nome.trim().toLowerCase())
+        !produtosExistentes.includes(
+          produto.nome.trim().toLowerCase()
+        )
     );
   }, [produtos, produtosExistentes]);
 
+  const valorTotalLote = useMemo(() => {
+    return produtosPendentes.reduce(
+      (total, produto) => {
+        const preco =
+          produto.precoPromo &&
+          Number(produto.precoPromo) > 0 &&
+          Number(produto.precoPromo) <
+            Number(produto.preco)
+            ? Number(produto.precoPromo)
+            : Number(produto.preco);
+
+        return (
+          total +
+          (Number.isFinite(preco) ? preco : 0)
+        );
+      },
+      0
+    );
+  }, [produtosPendentes]);
+
+  function formatarMoeda(valor: number) {
+    return valor.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+  }
+
   async function cadastrarTodos() {
+    if (cadastrando) {
+      return;
+    }
+
     if (produtos.length === 0) {
-      setErro("Adicione pelo menos um produto ao lote.");
+      setErro(
+        "Adicione pelo menos um produto ao lote."
+      );
       return;
     }
 
@@ -276,51 +537,112 @@ export default function CadastroProdutosLotePage() {
       try {
         const formData = new FormData();
 
-        formData.append("nome", produto.nome.trim());
-        formData.append("descricao", produto.descricao.trim());
-        formData.append("preco", produto.preco);
-        formData.append("precoPromo", produto.precoPromo);
-        formData.append("estoque", produto.estoque || "0");
-        formData.append("categoriaId", produto.categoriaId);
-        formData.append("fornecedorId", produto.fornecedorId);
-        formData.append("skuFornecedor", produto.skuFornecedor);
-        formData.append("custoFornecedor", produto.custoFornecedor);
-        formData.append("linkFornecedor", produto.linkFornecedor);
-        formData.append("destaque", String(produto.destaque));
-        formData.append("oferta", String(produto.oferta));
-        formData.append("ativo", String(produto.ativo));
+        formData.append(
+          "nome",
+          produto.nome.trim()
+        );
 
-        const response = await fetch(`${API_URL}/produtos`, {
-          method: "POST",
-          body: formData,
-        });
+        formData.append(
+          "descricao",
+          produto.descricao.trim()
+        );
 
-        let data: unknown = null;
+        formData.append(
+          "preco",
+          produto.preco
+        );
 
-        try {
-          data = await response.json();
-        } catch {
-          data = null;
+        if (produto.precoPromo.trim()) {
+          formData.append(
+            "precoPromo",
+            produto.precoPromo
+          );
         }
 
-        if (!response.ok) {
-          const mensagemErro =
-            typeof data === "object" &&
-            data !== null &&
-            "message" in data &&
-            typeof data.message === "string"
-              ? data.message
-              : "Não foi possível cadastrar o produto.";
+        formData.append(
+          "estoque",
+          produto.estoque || "0"
+        );
 
-          throw new Error(mensagemErro);
+        formData.append(
+          "categoriaId",
+          produto.categoriaId
+        );
+
+        if (produto.fornecedorId) {
+          formData.append(
+            "fornecedorId",
+            produto.fornecedorId
+          );
+        }
+
+        if (produto.skuFornecedor.trim()) {
+          formData.append(
+            "skuFornecedor",
+            produto.skuFornecedor.trim()
+          );
+        }
+
+        if (produto.custoFornecedor.trim()) {
+          formData.append(
+            "custoFornecedor",
+            produto.custoFornecedor.trim()
+          );
+        }
+
+        if (produto.linkFornecedor.trim()) {
+          formData.append(
+            "linkFornecedor",
+            produto.linkFornecedor.trim()
+          );
+        }
+
+        formData.append(
+          "destaque",
+          String(produto.destaque)
+        );
+
+        formData.append(
+          "oferta",
+          String(produto.oferta)
+        );
+
+        formData.append(
+          "ativo",
+          String(produto.ativo)
+        );
+
+        const response = await fetch(
+          `${API_URL}/api/produtos`,
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
+
+        const data = await lerResposta(response);
+
+        if (!response.ok) {
+          throw new Error(
+            obterMensagemErro(
+              data,
+              "Não foi possível cadastrar o produto."
+            )
+          );
         }
 
         novosResultados.push({
           nome: produto.nome,
           sucesso: true,
-          mensagem: "Produto cadastrado com sucesso.",
+          mensagem:
+            "Produto cadastrado com sucesso.",
         });
       } catch (error) {
+        console.error(
+          `[Cadastro em lote] Erro no produto "${produto.nome}":`,
+          error
+        );
+
         novosResultados.push({
           nome: produto.nome,
           sucesso: false,
@@ -330,26 +652,43 @@ export default function CadastroProdutosLotePage() {
               : "Erro ao cadastrar o produto.",
         });
       }
+
+      setResultados([...novosResultados]);
     }
 
+    const quantidadeSucesso =
+      novosResultados.filter(
+        (resultado) => resultado.sucesso
+      ).length;
+
+    const quantidadeErro =
+      novosResultados.filter(
+        (resultado) => !resultado.sucesso
+      ).length;
+
     setResultados(novosResultados);
-
-    const quantidadeSucesso = novosResultados.filter(
-      (resultado) => resultado.sucesso
-    ).length;
-
-    const quantidadeErro = novosResultados.filter(
-      (resultado) => !resultado.sucesso
-    ).length;
 
     if (quantidadeErro === 0) {
       setMensagem(
         `${quantidadeSucesso} produto(s) cadastrado(s) com sucesso.`
       );
+
       setProdutos([]);
     } else {
       setMensagem(
         `${quantidadeSucesso} cadastrado(s) e ${quantidadeErro} com erro.`
+      );
+
+      const nomesComErro = novosResultados
+        .filter(
+          (resultado) => !resultado.sucesso
+        )
+        .map((resultado) => resultado.nome);
+
+      setProdutos((anterior) =>
+        anterior.filter((produto) =>
+          nomesComErro.includes(produto.nome)
+        )
       );
     }
 
@@ -375,6 +714,7 @@ export default function CadastroProdutosLotePage() {
   return (
     <main className="min-h-screen bg-gray-50 p-6">
       <div className="mx-auto max-w-7xl space-y-6">
+
         {/* Cabeçalho */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -389,7 +729,9 @@ export default function CadastroProdutosLotePage() {
 
           <button
             type="button"
-            onClick={() => router.push("/admin/produtos")}
+            onClick={() =>
+              router.push("/admin/produtos")
+            }
             className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 font-medium text-gray-700 transition hover:bg-gray-100"
           >
             ← Voltar para produtos
@@ -417,7 +759,9 @@ export default function CadastroProdutosLotePage() {
             </h2>
 
             <p className="mt-1 text-sm text-gray-500">
-              Preencha os dados e clique em "Adicionar ao lote".
+              Preencha os dados e clique em
+              {" "}
+              "Adicionar ao lote".
             </p>
           </div>
 
@@ -426,6 +770,7 @@ export default function CadastroProdutosLotePage() {
             className="space-y-6"
           >
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+
               {/* Nome */}
               <div className="md:col-span-2">
                 <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -442,7 +787,8 @@ export default function CadastroProdutosLotePage() {
                     )
                   }
                   placeholder="Ex.: Cama Confortável para Pets"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  disabled={cadastrando}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
                 />
               </div>
 
@@ -462,7 +808,8 @@ export default function CadastroProdutosLotePage() {
                   }
                   rows={4}
                   placeholder="Descrição do produto..."
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  disabled={cadastrando}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
                 />
               </div>
 
@@ -484,7 +831,8 @@ export default function CadastroProdutosLotePage() {
                     )
                   }
                   placeholder="89.90"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  disabled={cadastrando}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
                 />
               </div>
 
@@ -506,7 +854,8 @@ export default function CadastroProdutosLotePage() {
                     )
                   }
                   placeholder="69.90"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  disabled={cadastrando}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
                 />
               </div>
 
@@ -527,7 +876,8 @@ export default function CadastroProdutosLotePage() {
                       event.target.value
                     )
                   }
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  disabled={cadastrando}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
                 />
               </div>
 
@@ -545,9 +895,12 @@ export default function CadastroProdutosLotePage() {
                       event.target.value
                     )
                   }
-                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  disabled={cadastrando}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
                 >
-                  <option value="">Selecione uma categoria</option>
+                  <option value="">
+                    Selecione uma categoria
+                  </option>
 
                   {categorias.map((categoria) => (
                     <option
@@ -574,9 +927,12 @@ export default function CadastroProdutosLotePage() {
                       event.target.value
                     )
                   }
-                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  disabled={cadastrando}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
                 >
-                  <option value="">Sem fornecedor</option>
+                  <option value="">
+                    Sem fornecedor
+                  </option>
 
                   {fornecedores.map((fornecedor) => (
                     <option
@@ -605,7 +961,8 @@ export default function CadastroProdutosLotePage() {
                     )
                   }
                   placeholder="PM-CAM-001"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  disabled={cadastrando}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
                 />
               </div>
 
@@ -627,7 +984,8 @@ export default function CadastroProdutosLotePage() {
                     )
                   }
                   placeholder="42.00"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  disabled={cadastrando}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
                 />
               </div>
 
@@ -647,7 +1005,8 @@ export default function CadastroProdutosLotePage() {
                     )
                   }
                   placeholder="https://..."
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  disabled={cadastrando}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
                 />
               </div>
             </div>
@@ -664,6 +1023,7 @@ export default function CadastroProdutosLotePage() {
                       event.target.checked
                     )
                   }
+                  disabled={cadastrando}
                   className="h-4 w-4"
                 />
 
@@ -682,6 +1042,7 @@ export default function CadastroProdutosLotePage() {
                       event.target.checked
                     )
                   }
+                  disabled={cadastrando}
                   className="h-4 w-4"
                 />
 
@@ -700,6 +1061,7 @@ export default function CadastroProdutosLotePage() {
                       event.target.checked
                     )
                   }
+                  disabled={cadastrando}
                   className="h-4 w-4"
                 />
 
@@ -713,7 +1075,8 @@ export default function CadastroProdutosLotePage() {
             <div className="flex flex-wrap gap-3 border-t pt-5">
               <button
                 type="submit"
-                className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-700"
+                disabled={cadastrando}
+                className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
               >
                 + Adicionar ao lote
               </button>
@@ -721,7 +1084,8 @@ export default function CadastroProdutosLotePage() {
               <button
                 type="button"
                 onClick={limparFormulario}
-                className="rounded-lg border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 transition hover:bg-gray-100"
+                disabled={cadastrando}
+                className="rounded-lg border border-gray-300 bg-white px-6 py-3 font-semibold text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:bg-gray-100"
               >
                 Limpar
               </button>
@@ -730,32 +1094,54 @@ export default function CadastroProdutosLotePage() {
         </section>
 
         {/* Resumo */}
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-5">
           <div className="rounded-xl bg-white p-5 shadow-sm">
-            <p className="text-sm text-gray-500">No lote</p>
+            <p className="text-sm text-gray-500">
+              No lote
+            </p>
+
             <p className="mt-1 text-3xl font-bold text-gray-900">
               {produtos.length}
             </p>
           </div>
 
           <div className="rounded-xl bg-white p-5 shadow-sm">
-            <p className="text-sm text-gray-500">Prontos para cadastro</p>
+            <p className="text-sm text-gray-500">
+              Prontos para cadastro
+            </p>
+
             <p className="mt-1 text-3xl font-bold text-green-600">
               {produtosPendentes.length}
             </p>
           </div>
 
           <div className="rounded-xl bg-white p-5 shadow-sm">
-            <p className="text-sm text-gray-500">Já existentes</p>
+            <p className="text-sm text-gray-500">
+              Já existentes
+            </p>
+
             <p className="mt-1 text-3xl font-bold text-orange-500">
               {produtosDuplicados.length}
             </p>
           </div>
 
           <div className="rounded-xl bg-white p-5 shadow-sm">
-            <p className="text-sm text-gray-500">Categorias</p>
+            <p className="text-sm text-gray-500">
+              Categorias
+            </p>
+
             <p className="mt-1 text-3xl font-bold text-gray-900">
               {categorias.length}
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-white p-5 shadow-sm">
+            <p className="text-sm text-gray-500">
+              Valor do lote
+            </p>
+
+            <p className="mt-1 text-xl font-bold text-blue-600">
+              {formatarMoeda(valorTotalLote)}
             </p>
           </div>
         </section>
@@ -773,19 +1159,32 @@ export default function CadastroProdutosLotePage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={cadastrarTodos}
-              disabled={
-                cadastrando ||
-                produtosPendentes.length === 0
-              }
-              className="rounded-lg bg-green-600 px-6 py-3 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-400"
-            >
-              {cadastrando
-                ? "Cadastrando..."
-                : `Cadastrar ${produtosPendentes.length} produto(s)`}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {produtos.length > 0 && (
+                <button
+                  type="button"
+                  onClick={limparLote}
+                  disabled={cadastrando}
+                  className="rounded-lg border border-gray-300 bg-white px-5 py-3 font-semibold text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:bg-gray-100"
+                >
+                  Limpar lote
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={cadastrarTodos}
+                disabled={
+                  cadastrando ||
+                  produtosPendentes.length === 0
+                }
+                className="rounded-lg bg-green-600 px-6 py-3 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+              >
+                {cadastrando
+                  ? "Cadastrando..."
+                  : `Cadastrar ${produtosPendentes.length} produto(s)`}
+              </button>
+            </div>
           </div>
 
           {produtos.length === 0 ? (
@@ -803,17 +1202,22 @@ export default function CadastroProdutosLotePage() {
               {produtos.map((produto, index) => {
                 const categoria = categorias.find(
                   (item) =>
-                    item.id === Number(produto.categoriaId)
+                    item.id ===
+                    Number(produto.categoriaId)
                 );
 
                 const fornecedor = fornecedores.find(
                   (item) =>
-                    item.id === Number(produto.fornecedorId)
+                    item.id ===
+                    Number(produto.fornecedorId)
                 );
 
-                const jaExiste = produtosExistentes.includes(
-                  produto.nome.trim().toLowerCase()
-                );
+                const jaExiste =
+                  produtosExistentes.includes(
+                    produto.nome
+                      .trim()
+                      .toLowerCase()
+                  );
 
                 return (
                   <div
@@ -840,7 +1244,25 @@ export default function CadastroProdutosLotePage() {
                               Já cadastrado
                             </span>
                           )}
+
+                          {produto.oferta && (
+                            <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
+                              Oferta
+                            </span>
+                          )}
+
+                          {produto.destaque && (
+                            <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                              Destaque
+                            </span>
+                          )}
                         </div>
+
+                        {produto.descricao && (
+                          <p className="mt-2 line-clamp-2 text-sm text-gray-500">
+                            {produto.descricao}
+                          </p>
+                        )}
 
                         <div className="mt-3 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
                           <div>
@@ -850,7 +1272,9 @@ export default function CadastroProdutosLotePage() {
 
                             <p className="font-semibold text-gray-900">
                               R${" "}
-                              {Number(produto.preco).toFixed(2)}
+                              {Number(
+                                produto.preco
+                              ).toFixed(2)}
                             </p>
                           </div>
 
@@ -884,7 +1308,8 @@ export default function CadastroProdutosLotePage() {
                             </span>
 
                             <p className="font-semibold text-gray-900">
-                              {categoria?.nome || "—"}
+                              {categoria?.nome ||
+                                "—"}
                             </p>
                           </div>
 
@@ -894,7 +1319,8 @@ export default function CadastroProdutosLotePage() {
                             </span>
 
                             <p className="font-semibold text-gray-900">
-                              {fornecedor?.nome || "—"}
+                              {fornecedor?.nome ||
+                                "—"}
                             </p>
                           </div>
 
@@ -904,7 +1330,8 @@ export default function CadastroProdutosLotePage() {
                             </span>
 
                             <p className="font-semibold text-gray-900">
-                              {produto.skuFornecedor || "—"}
+                              {produto.skuFornecedor ||
+                                "—"}
                             </p>
                           </div>
 
@@ -934,15 +1361,30 @@ export default function CadastroProdutosLotePage() {
                             </p>
                           </div>
                         </div>
+
+                        {produto.linkFornecedor && (
+                          <div className="mt-3">
+                            <span className="text-xs text-gray-500">
+                              Link fornecedor
+                            </span>
+
+                            <p className="truncate text-sm font-medium text-blue-600">
+                              {produto.linkFornecedor}
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex shrink-0 gap-2">
                         <button
                           type="button"
                           onClick={() =>
-                            editarProduto(produto.id)
+                            editarProduto(
+                              produto.id
+                            )
                           }
-                          className="rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50"
+                          disabled={cadastrando}
+                          className="rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Editar
                         </button>
@@ -950,9 +1392,12 @@ export default function CadastroProdutosLotePage() {
                         <button
                           type="button"
                           onClick={() =>
-                            removerProduto(produto.id)
+                            removerProduto(
+                              produto.id
+                            )
                           }
-                          className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                          disabled={cadastrando}
+                          className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Remover
                         </button>
@@ -973,32 +1418,34 @@ export default function CadastroProdutosLotePage() {
             </h2>
 
             <div className="space-y-2">
-              {resultados.map((resultado, index) => (
-                <div
-                  key={`${resultado.nome}-${index}`}
-                  className={`rounded-lg border p-4 ${
-                    resultado.sucesso
-                      ? "border-green-200 bg-green-50"
-                      : "border-red-200 bg-red-50"
-                  }`}
-                >
-                  <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                    <span className="font-medium text-gray-900">
-                      {resultado.nome}
-                    </span>
+              {resultados.map(
+                (resultado, index) => (
+                  <div
+                    key={`${resultado.nome}-${index}`}
+                    className={`rounded-lg border p-4 ${
+                      resultado.sucesso
+                        ? "border-green-200 bg-green-50"
+                        : "border-red-200 bg-red-50"
+                    }`}
+                  >
+                    <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                      <span className="font-medium text-gray-900">
+                        {resultado.nome}
+                      </span>
 
-                    <span
-                      className={
-                        resultado.sucesso
-                          ? "text-sm font-medium text-green-700"
-                          : "text-sm font-medium text-red-700"
-                      }
-                    >
-                      {resultado.mensagem}
-                    </span>
+                      <span
+                        className={
+                          resultado.sucesso
+                            ? "text-sm font-medium text-green-700"
+                            : "text-sm font-medium text-red-700"
+                        }
+                      >
+                        {resultado.mensagem}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              )}
             </div>
           </section>
         )}

@@ -8,16 +8,14 @@ import {
   useState,
 } from "react";
 
-interface Categoria {
-  id: number;
-  nome: string;
-  descricao?: string | null;
-  imagem?: string | null;
-  ativo: boolean;
-}
+import {
+  getCategorias,
+  getImagemUrl,
+  type Categoria,
+  getApiUrl,
+} from "@/services/api";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+const API_URL = getApiUrl();
 
 const TAMANHO_MAXIMO_IMAGEM = 5 * 1024 * 1024;
 
@@ -39,10 +37,8 @@ export default function CategoriasAdminPage() {
 
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
-
   const [imagem, setImagem] = useState<File | null>(null);
   const [previewImagem, setPreviewImagem] = useState("");
-
   const [ativo, setAtivo] = useState(true);
 
   const [salvando, setSalvando] = useState(false);
@@ -57,17 +53,13 @@ export default function CategoriasAdminPage() {
       setCarregando(true);
       setErro("");
 
-      const response = await fetch(`${API_URL}/categorias`);
+      const dados = await getCategorias();
 
-      if (!response.ok) {
-        throw new Error("Erro ao carregar categorias.");
-      }
-
-      const data = await response.json();
-
-      setCategorias(data);
+      setCategorias(Array.isArray(dados) ? dados : []);
     } catch (error) {
-      console.error(error);
+      console.error("Erro ao carregar categorias:", error);
+
+      setCategorias([]);
       setErro("Não foi possível carregar as categorias.");
     } finally {
       setCarregando(false);
@@ -140,7 +132,6 @@ export default function CategoriasAdminPage() {
     setImagem(arquivo);
 
     const url = URL.createObjectURL(arquivo);
-
     setPreviewImagem(url);
   }
 
@@ -153,14 +144,19 @@ export default function CategoriasAdminPage() {
 
     setNome("");
     setDescricao("");
+    setAtivo(true);
 
     limparImagem();
 
-    setAtivo(true);
     setMensagem("");
     setErro("");
 
     setMostrarFormulario(true);
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   }
 
   // ============================================================
@@ -172,14 +168,19 @@ export default function CategoriasAdminPage() {
 
     setNome(categoria.nome);
     setDescricao(categoria.descricao || "");
+    setAtivo(categoria.ativo ?? true);
 
     setImagem(null);
-    setPreviewImagem(categoria.imagem || "");
 
-    setAtivo(categoria.ativo);
+    setPreviewImagem(
+      categoria.imagem
+        ? getImagemUrl(categoria.imagem)
+        : ""
+    );
 
     setMensagem("");
     setErro("");
+
     setMostrarFormulario(true);
 
     window.scrollTo({
@@ -200,10 +201,10 @@ export default function CategoriasAdminPage() {
 
     setNome("");
     setDescricao("");
+    setAtivo(true);
 
     limparImagem();
 
-    setAtivo(true);
     setMensagem("");
     setErro("");
   }
@@ -231,22 +232,15 @@ export default function CategoriasAdminPage() {
       const editando = Boolean(categoriaEditando);
 
       const url = editando
-        ? `${API_URL}/categorias/${categoriaEditando!.id}`
-        : `${API_URL}/categorias`;
+        ? `${API_URL}/api/categorias/${categoriaEditando!.id}`
+        : `${API_URL}/api/categorias`;
 
       const formData = new FormData();
 
       formData.append("nome", nome.trim());
-      formData.append(
-        "descricao",
-        descricao.trim()
-      );
-      formData.append(
-        "ativo",
-        String(ativo)
-      );
+      formData.append("descricao", descricao.trim());
+      formData.append("ativo", String(ativo));
 
-      // Nova imagem somente se o usuário selecionou um arquivo.
       if (imagem) {
         formData.append("imagem", imagem);
       }
@@ -280,7 +274,7 @@ export default function CategoriasAdminPage() {
         fecharFormulario();
       }, 1000);
     } catch (error) {
-      console.error(error);
+      console.error("Erro ao salvar categoria:", error);
 
       setMensagem(
         error instanceof Error
@@ -300,7 +294,8 @@ export default function CategoriasAdminPage() {
     <main className="min-h-screen bg-[#fffaf5] px-6 py-10">
       <div className="mx-auto max-w-7xl">
 
-        {/* Cabeçalho */}
+        {/* CABEÇALHO */}
+
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <Link
@@ -328,9 +323,11 @@ export default function CategoriasAdminPage() {
           </button>
         </div>
 
-        {/* Formulário */}
+        {/* FORMULÁRIO */}
+
         {mostrarFormulario && (
           <section className="mt-8 rounded-3xl border border-[#eadfd6] bg-white p-6 shadow-sm">
+
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-[#2d2a26]">
@@ -360,7 +357,9 @@ export default function CategoriasAdminPage() {
               onSubmit={salvarCategoria}
               className="mt-6 grid gap-5 md:grid-cols-2"
             >
-              {/* Nome */}
+
+              {/* NOME */}
+
               <div>
                 <label
                   htmlFor="nome"
@@ -382,7 +381,8 @@ export default function CategoriasAdminPage() {
                 />
               </div>
 
-              {/* Imagem */}
+              {/* IMAGEM */}
+
               <div>
                 <label
                   htmlFor="imagem"
@@ -404,7 +404,6 @@ export default function CategoriasAdminPage() {
                   JPG, PNG ou WEBP • máximo de 5 MB
                 </p>
 
-                {/* Preview */}
                 {previewImagem && (
                   <div className="mt-4">
                     <div className="relative h-48 w-full overflow-hidden rounded-2xl border border-[#eadfd6] bg-[#fffaf5]">
@@ -415,7 +414,7 @@ export default function CategoriasAdminPage() {
                             ? "Prévia da imagem selecionada"
                             : `Imagem atual da categoria ${nome}`
                         }
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-contain"
                       />
                     </div>
 
@@ -439,7 +438,8 @@ export default function CategoriasAdminPage() {
                 )}
               </div>
 
-              {/* Descrição */}
+              {/* DESCRIÇÃO */}
+
               <div className="md:col-span-2">
                 <label
                   htmlFor="descricao"
@@ -461,7 +461,8 @@ export default function CategoriasAdminPage() {
                 />
               </div>
 
-              {/* Status */}
+              {/* STATUS */}
+
               <div className="md:col-span-2">
                 <label className="flex cursor-pointer items-center gap-3">
                   <input
@@ -484,7 +485,8 @@ export default function CategoriasAdminPage() {
                 </p>
               </div>
 
-              {/* Mensagem */}
+              {/* MENSAGEM */}
+
               {mensagem && (
                 <div className="md:col-span-2">
                   <div className="rounded-2xl bg-[#fff4ec] px-4 py-3 text-sm font-semibold text-[#c96d53]">
@@ -493,7 +495,8 @@ export default function CategoriasAdminPage() {
                 </div>
               )}
 
-              {/* Botões */}
+              {/* BOTÕES */}
+
               <div className="flex flex-col gap-3 sm:flex-row md:col-span-2">
                 <button
                   type="submit"
@@ -520,8 +523,10 @@ export default function CategoriasAdminPage() {
           </section>
         )}
 
-        {/* Lista */}
+        {/* LISTA */}
+
         <section className="mt-8 overflow-hidden rounded-3xl border border-[#eadfd6] bg-white shadow-sm">
+
           {carregando ? (
             <div className="px-6 py-12 text-center text-[#756f69]">
               Carregando categorias...
@@ -590,23 +595,20 @@ export default function CategoriasAdminPage() {
                       key={categoria.id}
                       className="border-b border-[#eadfd6] last:border-0"
                     >
+
+                      {/* CATEGORIA */}
+
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
+
                           <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-[#fff4ec]">
                             {categoria.imagem ? (
                               <img
-                                src={
-                                  categoria.imagem.startsWith(
-                                    "http"
-                                  )
-                                    ? categoria.imagem
-                                    : `${API_URL.replace(
-                                        /\/api\/?$/,
-                                        ""
-                                      )}${categoria.imagem}`
-                                }
+                                src={getImagemUrl(
+                                  categoria.imagem
+                                )}
                                 alt={categoria.nome}
-                                className="h-full w-full object-cover"
+                                className="h-full w-full object-contain"
                               />
                             ) : (
                               <span className="text-2xl">
@@ -627,10 +629,14 @@ export default function CategoriasAdminPage() {
                         </div>
                       </td>
 
+                      {/* DESCRIÇÃO */}
+
                       <td className="px-6 py-5 text-sm text-[#756f69]">
                         {categoria.descricao ||
                           "Sem descrição"}
                       </td>
+
+                      {/* STATUS */}
 
                       <td className="px-6 py-5 text-center">
                         <span
@@ -645,6 +651,8 @@ export default function CategoriasAdminPage() {
                             : "Inativa"}
                         </span>
                       </td>
+
+                      {/* AÇÕES */}
 
                       <td className="px-6 py-5 text-right">
                         <div className="flex justify-end gap-2">

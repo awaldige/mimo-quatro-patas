@@ -8,8 +8,11 @@ import {
 } from "react";
 import { useParams, useRouter } from "next/navigation";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+const API_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+)
+  .replace(/\/+$/, "")
+  .replace(/\/api$/, "");
 
 interface Categoria {
   id: number;
@@ -92,21 +95,53 @@ function formatarImagem(imagem: string | null) {
     return null;
   }
 
+  const imagemNormalizada = String(imagem).trim();
+
+  if (!imagemNormalizada) {
+    return null;
+  }
+
   if (
-    imagem.startsWith("http://") ||
-    imagem.startsWith("https://") ||
-    imagem.startsWith("data:")
+    imagemNormalizada.startsWith("http://") ||
+    imagemNormalizada.startsWith("https://") ||
+    imagemNormalizada.startsWith("data:")
   ) {
-    return imagem;
+    return imagemNormalizada;
   }
 
-  const baseUrl = API_URL.replace(/\/api\/?$/, "");
-
-  if (imagem.startsWith("/")) {
-    return `${baseUrl}${imagem}`;
+  if (
+    imagemNormalizada.startsWith("/imagem/") ||
+    imagemNormalizada.startsWith("/images/") ||
+    imagemNormalizada.startsWith("/produtos/")
+  ) {
+    return imagemNormalizada;
   }
 
-  return `${baseUrl}/${imagem}`;
+  if (imagemNormalizada.startsWith("/uploads/")) {
+    return `${API_URL}${imagemNormalizada}`;
+  }
+
+  if (!imagemNormalizada.startsWith("/")) {
+    return `${API_URL}/uploads/${imagemNormalizada}`;
+  }
+
+  return imagemNormalizada;
+}
+
+async function lerResposta(response: Response) {
+  const texto = await response.text();
+
+  if (!texto) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(texto);
+  } catch {
+    throw new Error(
+      `A API retornou uma resposta inválida. Status: ${response.status} ${response.statusText}`
+    );
+  }
 }
 
 export default function EditarProdutoPage() {
@@ -167,37 +202,69 @@ export default function EditarProdutoPage() {
         setCarregando(true);
         setErro("");
 
+        const produtoUrl = `${API_URL}/api/produtos/${id}`;
+        const categoriasUrl = `${API_URL}/api/categorias`;
+        const fornecedoresUrl = `${API_URL}/api/fornecedores`;
+
+        console.log("[Admin Editar Produto] API:", API_URL);
+        console.log(
+          "[Admin Editar Produto] Produto:",
+          produtoUrl
+        );
+        console.log(
+          "[Admin Editar Produto] Categorias:",
+          categoriasUrl
+        );
+        console.log(
+          "[Admin Editar Produto] Fornecedores:",
+          fornecedoresUrl
+        );
+
         const [
           produtoResponse,
           categoriasResponse,
           fornecedoresResponse,
         ] = await Promise.all([
-          fetch(`${API_URL}/produtos/${id}`),
-          fetch(`${API_URL}/categorias`),
-          fetch(`${API_URL}/fornecedores`),
+          fetch(produtoUrl, {
+            cache: "no-store",
+          }),
+          fetch(categoriasUrl, {
+            cache: "no-store",
+          }),
+          fetch(fornecedoresUrl, {
+            cache: "no-store",
+          }),
         ]);
+
+        const produtoData =
+          await lerResposta(produtoResponse);
 
         if (!produtoResponse.ok) {
           throw new Error(
-            "Não foi possível carregar o produto."
+            produtoData?.message ||
+              produtoData?.erro ||
+              "Não foi possível carregar o produto."
           );
         }
 
-        const produtoData =
-          await produtoResponse.json();
-
         const categoriasData =
           categoriasResponse.ok
-            ? await categoriasResponse.json()
+            ? await lerResposta(categoriasResponse)
             : [];
 
         const fornecedoresData =
           fornecedoresResponse.ok
-            ? await fornecedoresResponse.json()
+            ? await lerResposta(fornecedoresResponse)
             : [];
 
         const produtoCarregado: Produto =
           produtoData?.produto ?? produtoData;
+
+        if (!produtoCarregado || !produtoCarregado.id) {
+          throw new Error(
+            "Produto não encontrado."
+          );
+        }
 
         const categoriasCarregadas =
           extrairArray<Categoria>(
@@ -262,7 +329,7 @@ export default function EditarProdutoPage() {
         );
       } catch (error) {
         console.error(
-          "[Admin Produtos] Erro:",
+          "[Admin Editar Produto] Erro:",
           error
         );
 
@@ -297,6 +364,28 @@ export default function EditarProdutoPage() {
     if (!arquivo) {
       return;
     }
+
+    if (arquivo.size > 5 * 1024 * 1024) {
+      setErro(
+        "A imagem deve ter no máximo 5 MB."
+      );
+      return;
+    }
+
+    const tiposPermitidos = [
+      "image/png",
+      "image/jpeg",
+      "image/webp",
+    ];
+
+    if (!tiposPermitidos.includes(arquivo.type)) {
+      setErro(
+        "Selecione uma imagem PNG, JPG ou WEBP."
+      );
+      return;
+    }
+
+    setErro("");
 
     setNovaImagem(arquivo);
 
@@ -337,6 +426,15 @@ export default function EditarProdutoPage() {
       if (Number(formulario.estoque) < 0) {
         throw new Error(
           "O estoque não pode ser negativo."
+        );
+      }
+
+      if (
+        formulario.precoPromo &&
+        Number(formulario.precoPromo) < 0
+      ) {
+        throw new Error(
+          "O preço promocional não pode ser negativo."
         );
       }
 
@@ -430,16 +528,20 @@ export default function EditarProdutoPage() {
         );
       }
 
-      const response = await fetch(
-        `${API_URL}/produtos/${produto.id}`,
-        {
-          method: "PUT",
-          body: dados,
-        }
+      const url = `${API_URL}/api/produtos/${produto.id}`;
+
+      console.log(
+        "[Admin Editar Produto] Atualizando:",
+        url
       );
 
+      const response = await fetch(url, {
+        method: "PUT",
+        body: dados,
+      });
+
       const resultado =
-        await response.json().catch(() => null);
+        await lerResposta(response);
 
       if (!response.ok) {
         throw new Error(
@@ -461,6 +563,10 @@ export default function EditarProdutoPage() {
 
       setNovaImagem(null);
 
+      if (previewImagem) {
+        URL.revokeObjectURL(previewImagem);
+      }
+
       setPreviewImagem(null);
 
       setMensagem(
@@ -472,7 +578,7 @@ export default function EditarProdutoPage() {
       }, 900);
     } catch (error) {
       console.error(
-        "[Admin Produtos] Erro ao salvar:",
+        "[Admin Editar Produto] Erro ao salvar:",
         error
       );
 
@@ -504,15 +610,19 @@ export default function EditarProdutoPage() {
       setErro("");
       setMensagem("");
 
-      const response = await fetch(
-        `${API_URL}/produtos/${produto.id}`,
-        {
-          method: "DELETE",
-        }
+      const url = `${API_URL}/api/produtos/${produto.id}`;
+
+      console.log(
+        "[Admin Editar Produto] Desativando:",
+        url
       );
 
+      const response = await fetch(url, {
+        method: "DELETE",
+      });
+
       const resultado =
-        await response.json().catch(() => null);
+        await lerResposta(response);
 
       if (!response.ok) {
         throw new Error(
@@ -531,7 +641,7 @@ export default function EditarProdutoPage() {
       }, 800);
     } catch (error) {
       console.error(
-        "[Admin Produtos] Erro ao desativar:",
+        "[Admin Editar Produto] Erro ao desativar:",
         error
       );
 
@@ -595,8 +705,6 @@ export default function EditarProdutoPage() {
     <main className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="mx-auto max-w-6xl">
 
-        {/* Cabeçalho */}
-
         <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <button
@@ -631,8 +739,6 @@ export default function EditarProdutoPage() {
           </span>
         </div>
 
-        {/* Mensagens */}
-
         {erro && (
           <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {erro}
@@ -648,11 +754,7 @@ export default function EditarProdutoPage() {
         <form onSubmit={salvarProduto}>
           <div className="grid gap-6 lg:grid-cols-3">
 
-            {/* Coluna principal */}
-
             <div className="space-y-6 lg:col-span-2">
-
-              {/* Informações */}
 
               <section className="rounded-xl bg-white p-6 shadow-sm">
                 <h2 className="mb-5 text-lg font-semibold text-gray-900">
@@ -699,8 +801,6 @@ export default function EditarProdutoPage() {
                   </div>
                 </div>
               </section>
-
-              {/* Preços */}
 
               <section className="rounded-xl bg-white p-6 shadow-sm">
                 <h2 className="mb-5 text-lg font-semibold text-gray-900">
@@ -770,8 +870,6 @@ export default function EditarProdutoPage() {
                 </div>
               </section>
 
-              {/* Categoria */}
-
               <section className="rounded-xl bg-white p-6 shadow-sm">
                 <h2 className="mb-5 text-lg font-semibold text-gray-900">
                   Categoria
@@ -803,8 +901,6 @@ export default function EditarProdutoPage() {
                   )}
                 </select>
               </section>
-
-              {/* Dropshipping */}
 
               <section className="rounded-xl bg-white p-6 shadow-sm">
                 <div className="mb-5">
@@ -923,8 +1019,6 @@ export default function EditarProdutoPage() {
                 </div>
               </section>
 
-              {/* Configurações */}
-
               <section className="rounded-xl bg-white p-6 shadow-sm">
                 <h2 className="mb-5 text-lg font-semibold text-gray-900">
                   Configurações
@@ -1013,11 +1107,7 @@ export default function EditarProdutoPage() {
               </section>
             </div>
 
-            {/* Coluna lateral */}
-
             <div className="space-y-6">
-
-              {/* Imagem */}
 
               <section className="rounded-xl bg-white p-6 shadow-sm">
                 <h2 className="mb-5 text-lg font-semibold text-gray-900">
@@ -1044,7 +1134,7 @@ export default function EditarProdutoPage() {
                   </span>
 
                   <span className="mt-1 block text-xs text-gray-500">
-                    PNG, JPG ou WEBP
+                    PNG, JPG ou WEBP — máximo 5 MB
                   </span>
 
                   <input
@@ -1061,8 +1151,6 @@ export default function EditarProdutoPage() {
                   </p>
                 )}
               </section>
-
-              {/* Resumo */}
 
               <section className="rounded-xl bg-white p-6 shadow-sm">
                 <h2 className="mb-5 text-lg font-semibold text-gray-900">
@@ -1113,8 +1201,6 @@ export default function EditarProdutoPage() {
                   </div>
                 </div>
               </section>
-
-              {/* Ações */}
 
               <section className="rounded-xl bg-white p-6 shadow-sm">
                 <div className="space-y-3">

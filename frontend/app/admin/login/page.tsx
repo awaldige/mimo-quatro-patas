@@ -3,8 +3,11 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+const API_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+)
+  .replace(/\/+$/, "")
+  .replace(/\/api$/, "");
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -27,7 +30,11 @@ export default function AdminLoginPage() {
     try {
       setCarregando(true);
 
-      const url = `${API_URL.replace(/\/$/, "")}/admin/login`;
+      // Endpoint correto:
+      // http://localhost:3001/api/admin/login
+      // ou
+      // https://mimo-quatro-patas.onrender.com/api/admin/login
+      const url = `${API_URL}/api/admin/login`;
 
       console.log("Tentando login em:", url);
 
@@ -43,7 +50,11 @@ export default function AdminLoginPage() {
         }),
       });
 
-      let data;
+      let data: {
+        success?: boolean;
+        message?: string;
+        admin?: unknown;
+      };
 
       try {
         data = await response.json();
@@ -213,6 +224,7 @@ export default function AdminLoginPage() {
           <p className="mt-6 text-center text-xs text-[#a39a92]">
             Mimo Quatro Patas • Área administrativa
           </p>
+
         </div>
       </div>
     </main>
