@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -118,21 +117,8 @@ const STATUS_FORNECEDOR = [
   "ENTREGUE",
 ];
 
-/*
- * A variável NEXT_PUBLIC_API_URL pode estar:
- *
- * Local:
- * http://localhost:3001/api
- *
- * Produção:
- * https://mimo-quatro-patas.onrender.com/api
- *
- * Internamente trabalhamos sempre com a URL terminando
- * em /api para as requisições da API.
- */
 function obterApiUrl(): string {
-  const configurada =
-    process.env.NEXT_PUBLIC_API_URL?.trim();
+  const configurada = process.env.NEXT_PUBLIC_API_URL?.trim();
 
   const ambienteLocal =
     typeof window !== "undefined" &&
@@ -146,8 +132,7 @@ function obterApiUrl(): string {
   } else if (ambienteLocal) {
     base = "http://localhost:3001";
   } else {
-    base =
-      "https://mimo-quatro-patas.onrender.com";
+    base = "https://mimo-quatro-patas.onrender.com";
   }
 
   base = base
@@ -155,18 +140,11 @@ function obterApiUrl(): string {
     .replace(/\/+$/, "")
     .replace(/\/api$/i, "");
 
-  /*
-   * Impede uma configuração antiga de localhost
-   * de ser utilizada na produção.
-   */
   if (
     !ambienteLocal &&
-    /^https?:\/\/localhost(?::\d+)?$/i.test(
-      base
-    )
+    /^https?:\/\/localhost(?::\d+)?$/i.test(base)
   ) {
-    base =
-      "https://mimo-quatro-patas.onrender.com";
+    base = "https://mimo-quatro-patas.onrender.com";
   }
 
   return `${base}/api`;
@@ -174,20 +152,6 @@ function obterApiUrl(): string {
 
 const API_URL = obterApiUrl();
 
-/*
- * URL base dos arquivos enviados para /uploads.
- *
- * IMPORTANTE:
- * A API termina em /api, mas as imagens ficam em /uploads.
- *
- * Portanto:
- *
- * API:
- * https://mimo-quatro-patas.onrender.com/api
- *
- * Imagem:
- * https://mimo-quatro-patas.onrender.com/uploads/arquivo.jpg
- */
 function obterBaseArquivos(): string {
   return API_URL
     .replace(/\/api\/?$/i, "")
@@ -235,9 +199,7 @@ function formatarData(
   return data.toLocaleString("pt-BR");
 }
 
-function nomeStatusPedido(
-  status: string
-): string {
+function nomeStatusPedido(status: string): string {
   const nomes: Record<string, string> = {
     PENDENTE: "Pendente",
     PAGO: "Pago",
@@ -250,49 +212,32 @@ function nomeStatusPedido(
   return nomes[status] || status;
 }
 
-function nomeStatusFornecedor(
-  status: string
-): string {
+function nomeStatusFornecedor(status: string): string {
   const nomes: Record<string, string> = {
-    AGUARDANDO_FORNECEDOR:
-      "Aguardando fornecedor",
-
-    ENCAMINHADO_FORNECEDOR:
-      "Encaminhado ao fornecedor",
-
+    AGUARDANDO_FORNECEDOR: "Aguardando fornecedor",
+    ENCAMINHADO_FORNECEDOR: "Encaminhado ao fornecedor",
     PEDIDO_FORNECEDOR_REALIZADO:
       "Pedido do fornecedor realizado",
-
-    AGUARDANDO_ENVIO:
-      "Aguardando envio",
-
+    AGUARDANDO_ENVIO: "Aguardando envio",
     ENVIADO: "Enviado",
-
     ENTREGUE: "Entregue",
   };
 
   return nomes[status] || status;
 }
 
-function classeStatusFornecedor(
-  status: string
-): string {
+function classeStatusFornecedor(status: string): string {
   const classes: Record<string, string> = {
     AGUARDANDO_FORNECEDOR:
       "bg-yellow-100 text-yellow-700",
-
     ENCAMINHADO_FORNECEDOR:
       "bg-blue-100 text-blue-700",
-
     PEDIDO_FORNECEDOR_REALIZADO:
       "bg-purple-100 text-purple-700",
-
     AGUARDANDO_ENVIO:
       "bg-orange-100 text-orange-700",
-
     ENVIADO:
       "bg-indigo-100 text-indigo-700",
-
     ENTREGUE:
       "bg-green-100 text-green-700",
   };
@@ -303,15 +248,6 @@ function classeStatusFornecedor(
   );
 }
 
-/*
- * Constrói a URL correta da imagem.
- *
- * Exemplos aceitos:
- *
- * /uploads/foto.jpg
- * uploads/foto.jpg
- * https://mimo-quatro-patas.onrender.com/uploads/foto.jpg
- */
 function obterUrlImagem(
   imagem: string | null | undefined
 ): string | null {
@@ -325,10 +261,6 @@ function obterUrlImagem(
     return null;
   }
 
-  /*
-   * Se o banco já tiver uma URL completa,
-   * utilizamos diretamente.
-   */
   if (
     valor.startsWith("http://") ||
     valor.startsWith("https://")
@@ -336,17 +268,10 @@ function obterUrlImagem(
     return valor;
   }
 
-  /*
-   * Remove eventual /api que tenha vindo
-   * indevidamente junto do caminho.
-   */
   let caminho = valor
     .replace(/^\/+/, "")
     .replace(/^api\/+/i, "");
 
-  /*
-   * As imagens do projeto ficam em /uploads.
-   */
   if (!caminho.startsWith("uploads/")) {
     caminho = `uploads/${caminho}`;
   }
@@ -370,7 +295,8 @@ function obterProximaEtapa(
     AGUARDANDO_ENVIO:
       "ENVIADO",
 
-    ENVIADO: "ENTREGUE",
+    ENVIADO:
+      "ENTREGUE",
   };
 
   return fluxo[status] || null;
@@ -379,8 +305,7 @@ function obterProximaEtapa(
 function textoProximaEtapa(
   status: string
 ): string {
-  const proxima =
-    obterProximaEtapa(status);
+  const proxima = obterProximaEtapa(status);
 
   if (!proxima) {
     return "Fluxo concluído";
@@ -494,22 +419,18 @@ export default function PedidoDetalhesPage() {
       setPedido(pedidoRecebido);
 
       setStatusPedido(
-        pedidoRecebido.status ||
-          "PENDENTE"
+        pedidoRecebido.status || "PENDENTE"
       );
 
-      const novosStatusFornecedor: Record<
-        number,
-        string
-      > = {};
+      const novosStatusFornecedor:
+        Record<number, string> = {};
 
-      const novosNumerosFornecedor: Record<
-        number,
-        string
-      > = {};
+      const novosNumerosFornecedor:
+        Record<number, string> = {};
 
-      for (const item of pedidoRecebido.itens ||
-        []) {
+      for (
+        const item of pedidoRecebido.itens || []
+      ) {
         novosStatusFornecedor[item.id] =
           item.statusFornecedor ||
           "AGUARDANDO_FORNECEDOR";
@@ -747,8 +668,7 @@ export default function PedidoDetalhesPage() {
 
       if (
         itemAtualizado &&
-        typeof itemAtualizado ===
-          "object"
+        typeof itemAtualizado === "object"
       ) {
         setStatusFornecedor(
           (anterior) => ({
@@ -989,8 +909,7 @@ export default function PedidoDetalhesPage() {
             </button>
           )}
 
-          {statusAtual ===
-            "ENVIADO" && (
+          {statusAtual === "ENVIADO" && (
             <button
               type="button"
               onClick={() =>
@@ -1022,8 +941,18 @@ export default function PedidoDetalhesPage() {
       <main className="min-h-screen bg-[#fffaf5] px-4 py-10">
         <div className="mx-auto max-w-7xl">
           <div className="rounded-3xl border border-[#eadfd6] bg-white px-6 py-16 text-center shadow-sm">
-            <p className="text-[#756f69]">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#fff4ec]">
+              <span className="text-xl">
+                ⏳
+              </span>
+            </div>
+
+            <p className="mt-4 font-semibold text-[#2d2a26]">
               Carregando pedido...
+            </p>
+
+            <p className="mt-1 text-sm text-[#756f69]">
+              Aguarde enquanto buscamos os dados do pedido.
             </p>
           </div>
         </div>
@@ -1044,12 +973,12 @@ export default function PedidoDetalhesPage() {
               Pedido não encontrado
             </h1>
 
-            <p className="mt-2 text-red-500">
+            <p className="mt-2 text-sm leading-6 text-red-500">
               {erro ||
                 "Não foi possível carregar este pedido."}
             </p>
 
-            <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+            <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
               <button
                 type="button"
                 onClick={carregarPedido}
@@ -1060,8 +989,9 @@ export default function PedidoDetalhesPage() {
 
               <Link
                 href="/admin/pedidos"
-                className="rounded-full border border-[#eadfd6] px-6 py-3 font-semibold text-[#2d2a26] transition hover:bg-[#fff4ec]"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-[#eadfd6] bg-white px-6 py-3 font-semibold text-[#2d2a26] transition hover:border-[#e58b6f] hover:bg-[#fff4ec]"
               >
+                <span>←</span>
                 Voltar para pedidos
               </Link>
             </div>
@@ -1132,67 +1062,94 @@ export default function PedidoDetalhesPage() {
     <main className="min-h-screen bg-[#fffaf5] px-4 py-8 sm:px-6 sm:py-10">
       <div className="mx-auto max-w-7xl">
 
-        <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
-          <div>
-            <Link
-              href="/admin/pedidos"
-              className="text-sm font-semibold text-[#e58b6f] transition hover:text-[#c96d53]"
-            >
-              ← Voltar para pedidos
-            </Link>
+        {/* CABEÇALHO */}
+        <section className="rounded-3xl border border-[#eadfd6] bg-white p-5 shadow-sm sm:p-7">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
 
-            <h1 className="mt-3 text-3xl font-bold text-[#2d2a26]">
-              Pedido #{pedido.id}
-            </h1>
+            <div>
+              <Link
+                href="/admin/pedidos"
+                className="inline-flex items-center gap-2 rounded-full border border-[#eadfd6] bg-white px-5 py-2.5 text-sm font-bold text-[#2d2a26] shadow-sm transition hover:border-[#e58b6f] hover:bg-[#fff4ec] hover:text-[#c96d53]"
+              >
+                <span className="text-lg">
+                  ←
+                </span>
+                Voltar para pedidos
+              </Link>
 
-            <p className="mt-2 text-sm text-[#756f69]">
-              Realizado em{" "}
-              {formatarData(
-                pedido.createdAt
-              )}
-            </p>
+              <div className="mt-5">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="rounded-full bg-[#fff4ec] px-3 py-1 text-xs font-bold text-[#c96d53]">
+                    PEDIDO
+                  </span>
+
+                  <span className="text-sm text-[#a39a92]">
+                    #{pedido.id}
+                  </span>
+                </div>
+
+                <h1 className="mt-2 text-3xl font-bold text-[#2d2a26]">
+                  Gerenciar pedido #{pedido.id}
+                </h1>
+
+                <p className="mt-2 text-sm text-[#756f69]">
+                  Realizado em{" "}
+                  {formatarData(
+                    pedido.createdAt
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* CONTROLE PRINCIPAL */}
+            <div className="rounded-2xl bg-[#fffaf5] p-4 sm:p-5">
+              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-[#a39a92]">
+                Status do pedido
+              </p>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <select
+                  value={statusPedido}
+                  onChange={(event) =>
+                    setStatusPedido(
+                      event.target.value
+                    )
+                  }
+                  disabled={salvandoStatus}
+                  className="min-w-[190px] rounded-2xl border border-[#eadfd6] bg-white px-4 py-3 text-sm font-semibold text-[#2d2a26] outline-none transition focus:border-[#e58b6f]"
+                >
+                  {STATUS_PEDIDO.map(
+                    (status) => (
+                      <option
+                        key={status}
+                        value={status}
+                      >
+                        {nomeStatusPedido(
+                          status
+                        )}
+                      </option>
+                    )
+                  )}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={
+                    atualizarStatusPedido
+                  }
+                  disabled={salvandoStatus}
+                  className="rounded-2xl bg-[#e58b6f] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#c96d53] disabled:cursor-not-allowed disabled:bg-gray-300"
+                >
+                  {salvandoStatus
+                    ? "Salvando..."
+                    : "Salvar status"}
+                </button>
+              </div>
+            </div>
           </div>
+        </section>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <select
-              value={statusPedido}
-              onChange={(event) =>
-                setStatusPedido(
-                  event.target.value
-                )
-              }
-              disabled={salvandoStatus}
-              className="rounded-full border border-[#eadfd6] bg-white px-5 py-3 text-sm font-semibold text-[#2d2a26] outline-none focus:border-[#e58b6f]"
-            >
-              {STATUS_PEDIDO.map(
-                (status) => (
-                  <option
-                    key={status}
-                    value={status}
-                  >
-                    {nomeStatusPedido(
-                      status
-                    )}
-                  </option>
-                )
-              )}
-            </select>
-
-            <button
-              type="button"
-              onClick={
-                atualizarStatusPedido
-              }
-              disabled={salvandoStatus}
-              className="rounded-full bg-[#e58b6f] px-6 py-3 font-semibold text-white transition hover:bg-[#c96d53] disabled:cursor-not-allowed disabled:bg-gray-300"
-            >
-              {salvandoStatus
-                ? "Salvando..."
-                : "Atualizar status"}
-            </button>
-          </div>
-        </div>
-
+        {/* MENSAGEM */}
         {mensagem && (
           <div
             className={`mt-6 rounded-2xl border px-5 py-4 text-sm font-semibold ${
@@ -1205,10 +1162,11 @@ export default function PedidoDetalhesPage() {
           </div>
         )}
 
-        <section className="mt-8 grid gap-5 md:grid-cols-4">
+        {/* RESUMO */}
+        <section className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-3xl border border-[#eadfd6] bg-white p-6 shadow-sm">
             <p className="text-sm font-semibold text-[#756f69]">
-              Status do pedido
+              Status
             </p>
 
             <p className="mt-3 text-xl font-bold text-[#2d2a26]">
@@ -1249,19 +1207,32 @@ export default function PedidoDetalhesPage() {
             </p>
 
             <p className="mt-1 text-xs text-[#a39a92]">
-              itens entregues ao cliente
+              itens concluídos
             </p>
           </div>
         </section>
 
-        <section className="mt-8 grid gap-6 lg:grid-cols-2">
+        {/* CLIENTE E ENDEREÇO */}
+        <section className="mt-6 grid gap-6 lg:grid-cols-2">
           <div className="rounded-3xl border border-[#eadfd6] bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-[#2d2a26]">
-              Cliente
-            </h2>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#fff4ec]">
+                👤
+              </div>
 
-            <div className="mt-5 space-y-4">
               <div>
+                <h2 className="text-xl font-bold text-[#2d2a26]">
+                  Cliente
+                </h2>
+
+                <p className="text-sm text-[#756f69]">
+                  Dados do comprador
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#a39a92]">
                   Nome
                 </p>
@@ -1271,38 +1242,48 @@ export default function PedidoDetalhesPage() {
                 </p>
               </div>
 
-              {pedido.emailCliente && (
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#a39a92]">
-                    E-mail
-                  </p>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#a39a92]">
+                  E-mail
+                </p>
 
-                  <p className="mt-1 text-[#756f69]">
-                    {pedido.emailCliente}
-                  </p>
-                </div>
-              )}
+                <p className="mt-1 break-all text-sm text-[#756f69]">
+                  {pedido.emailCliente ||
+                    "Não informado"}
+                </p>
+              </div>
 
-              {pedido.telefoneCliente && (
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#a39a92]">
-                    Telefone
-                  </p>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#a39a92]">
+                  Telefone
+                </p>
 
-                  <p className="mt-1 text-[#756f69]">
-                    {pedido.telefoneCliente}
-                  </p>
-                </div>
-              )}
+                <p className="mt-1 text-sm text-[#756f69]">
+                  {pedido.telefoneCliente ||
+                    "Não informado"}
+                </p>
+              </div>
             </div>
           </div>
 
           <div className="rounded-3xl border border-[#eadfd6] bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-[#2d2a26]">
-              Endereço de entrega
-            </h2>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#fff4ec]">
+                📍
+              </div>
 
-            <div className="mt-5 space-y-2 text-[#756f69]">
+              <div>
+                <h2 className="text-xl font-bold text-[#2d2a26]">
+                  Endereço de entrega
+                </h2>
+
+                <p className="text-sm text-[#756f69]">
+                  Local de recebimento
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-2 text-sm leading-6 text-[#756f69]">
               {pedido.cep && (
                 <p>
                   <strong className="text-[#2d2a26]">
@@ -1313,7 +1294,7 @@ export default function PedidoDetalhesPage() {
               )}
 
               {pedido.endereco && (
-                <p>
+                <p className="font-semibold text-[#2d2a26]">
                   {pedido.endereco}
                   {pedido.numero
                     ? `, ${pedido.numero}`
@@ -1356,15 +1337,27 @@ export default function PedidoDetalhesPage() {
           </div>
         </section>
 
-        <section className="mt-8 rounded-3xl border border-[#eadfd6] bg-white shadow-sm">
-          <div className="border-b border-[#eadfd6] px-6 py-6">
-            <h2 className="text-xl font-bold text-[#2d2a26]">
-              Itens do pedido
-            </h2>
+        {/* ITENS */}
+        <section className="mt-6 overflow-hidden rounded-3xl border border-[#eadfd6] bg-white shadow-sm">
+          <div className="border-b border-[#eadfd6] bg-[#fffaf5] px-6 py-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-[#2d2a26]">
+                  Itens do pedido
+                </h2>
 
-            <p className="mt-1 text-sm text-[#756f69]">
-              Gerencie cada produto e avance o fluxo de dropshipping diretamente por aqui.
-            </p>
+                <p className="mt-1 text-sm text-[#756f69]">
+                  Gerencie produtos, fornecedores e o fluxo de dropshipping.
+                </p>
+              </div>
+
+              <span className="rounded-full bg-white px-4 py-2 text-sm font-bold text-[#2d2a26]">
+                {pedido.itens.length}{" "}
+                {pedido.itens.length === 1
+                  ? "item"
+                  : "itens"}
+              </span>
+            </div>
           </div>
 
           <div className="divide-y divide-[#eadfd6]">
@@ -1377,8 +1370,7 @@ export default function PedidoDetalhesPage() {
 
                 const custoItem =
                   Number(
-                    item.custoFornecedor ||
-                      0
+                    item.custoFornecedor || 0
                   ) *
                   item.quantidade;
 
@@ -1403,11 +1395,12 @@ export default function PedidoDetalhesPage() {
                 return (
                   <article
                     key={item.id}
-                    className="p-6"
+                    className="p-6 sm:p-7"
                   >
+                    {/* PRODUTO */}
                     <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-                      <div className="flex gap-4">
-                        <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#fff4ec]">
+                      <div className="flex min-w-0 gap-4">
+                        <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#eadfd6] bg-[#fff4ec]">
                           {imagemUrl ? (
                             <img
                               src={imagemUrl}
@@ -1415,11 +1408,6 @@ export default function PedidoDetalhesPage() {
                               className="h-full w-full object-cover"
                               loading="lazy"
                               onError={(event) => {
-                                /*
-                                 * Se o arquivo físico não existir,
-                                 * escondemos a imagem quebrada sem
-                                 * quebrar o restante do pedido.
-                                 */
                                 event.currentTarget.style.display =
                                   "none";
                               }}
@@ -1431,13 +1419,13 @@ export default function PedidoDetalhesPage() {
                           )}
                         </div>
 
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-xs font-semibold uppercase tracking-wide text-[#a39a92]">
                             Produto #
                             {item.produtoId}
                           </p>
 
-                          <h3 className="mt-1 text-lg font-bold text-[#2d2a26]">
+                          <h3 className="mt-1 break-words text-lg font-bold text-[#2d2a26]">
                             {item.nomeProduto}
                           </h3>
 
@@ -1460,8 +1448,8 @@ export default function PedidoDetalhesPage() {
                         </div>
                       </div>
 
-                      <div className="text-left xl:text-right">
-                        <p className="text-sm text-[#756f69]">
+                      <div className="rounded-2xl bg-[#fffaf5] p-4 text-left xl:min-w-[210px] xl:text-right">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[#a39a92]">
                           Preço unitário
                         </p>
 
@@ -1482,7 +1470,8 @@ export default function PedidoDetalhesPage() {
                       </div>
                     </div>
 
-                    <div className="mt-6 overflow-x-auto">
+                    {/* FLUXO */}
+                    <div className="mt-7 overflow-x-auto">
                       <div className="min-w-[760px]">
                         <div className="flex items-center">
                           {STATUS_FORNECEDOR.map(
@@ -1552,7 +1541,8 @@ export default function PedidoDetalhesPage() {
                       </div>
                     </div>
 
-                    <div className="mt-6 rounded-2xl bg-[#fffaf5] p-5">
+                    {/* FORNECEDOR */}
+                    <div className="mt-7 rounded-3xl bg-[#fffaf5] p-5 sm:p-6">
                       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                         <div>
                           <h4 className="font-bold text-[#2d2a26]">
@@ -1560,7 +1550,7 @@ export default function PedidoDetalhesPage() {
                           </h4>
 
                           <p className="mt-1 text-sm text-[#756f69]">
-                            Dados utilizados para o encaminhamento do pedido.
+                            Dados utilizados no encaminhamento do produto.
                           </p>
                         </div>
 
@@ -1575,7 +1565,7 @@ export default function PedidoDetalhesPage() {
                         )}
                       </div>
 
-                      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                      <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-wide text-[#a39a92]">
                             Nome
@@ -1628,10 +1618,10 @@ export default function PedidoDetalhesPage() {
                         </div>
                       </div>
 
-                      <div className="mt-4 grid gap-4 md:grid-cols-2">
-                        <div>
+                      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                        <div className="rounded-2xl bg-white p-4">
                           <p className="text-xs font-semibold uppercase tracking-wide text-[#a39a92]">
-                            Custo total do fornecedor
+                            Custo total
                           </p>
 
                           <p className="mt-1 font-bold text-[#2d2a26]">
@@ -1641,7 +1631,7 @@ export default function PedidoDetalhesPage() {
                           </p>
                         </div>
 
-                        <div>
+                        <div className="rounded-2xl bg-white p-4">
                           <p className="text-xs font-semibold uppercase tracking-wide text-[#a39a92]">
                             Link do fornecedor
                           </p>
@@ -1674,7 +1664,8 @@ export default function PedidoDetalhesPage() {
                       )}
                     </div>
 
-                    <div className="mt-6 rounded-2xl border border-[#eadfd6] p-5">
+                    {/* CONTROLE DROPSHIPPING */}
+                    <div className="mt-6 rounded-3xl border border-[#eadfd6] p-5 sm:p-6">
                       <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
                         <div>
                           <h4 className="font-bold text-[#2d2a26]">
@@ -1682,7 +1673,7 @@ export default function PedidoDetalhesPage() {
                           </h4>
 
                           <p className="mt-1 text-sm text-[#756f69]">
-                            Avance o pedido pela próxima etapa da operação.
+                            Controle aqui cada etapa do pedido junto ao fornecedor.
                           </p>
                         </div>
 
@@ -1702,18 +1693,25 @@ export default function PedidoDetalhesPage() {
                         statusAtual
                       )}
 
-                      <div className="mt-6 border-t border-[#eadfd6] pt-5">
-                        <p className="text-sm font-bold text-[#2d2a26]">
-                          Controle manual
-                        </p>
+                      {/* FORMULÁRIO MANUAL */}
+                      <div className="mt-7 rounded-2xl bg-[#fffaf5] p-5">
+                        <div>
+                          <h5 className="font-bold text-[#2d2a26]">
+                            Controle manual
+                          </h5>
 
-                        <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1fr_auto]">
+                          <p className="mt-1 text-sm text-[#756f69]">
+                            Atualize a etapa e o número do pedido no fornecedor.
+                          </p>
+                        </div>
+
+                        <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr_auto]">
                           <div>
                             <label
                               htmlFor={`status-fornecedor-${item.id}`}
                               className="mb-2 block text-sm font-semibold text-[#2d2a26]"
                             >
-                              Status
+                              Status do fornecedor
                             </label>
 
                             <select
@@ -1738,7 +1736,7 @@ export default function PedidoDetalhesPage() {
                                 salvandoFornecedor ===
                                 item.id
                               }
-                              className="w-full rounded-2xl border border-[#eadfd6] bg-[#fffaf5] px-4 py-3 text-sm font-semibold text-[#2d2a26] outline-none focus:border-[#e58b6f]"
+                              className="w-full rounded-2xl border border-[#eadfd6] bg-white px-4 py-3 text-sm font-semibold text-[#2d2a26] outline-none transition focus:border-[#e58b6f]"
                             >
                               {STATUS_FORNECEDOR.map(
                                 (status) => (
@@ -1787,12 +1785,12 @@ export default function PedidoDetalhesPage() {
                                   })
                                 )
                               }
-                              placeholder="Ex.: FORN-2026-001"
+                              placeholder="Ex.: 123456789"
                               disabled={
                                 salvandoFornecedor ===
                                 item.id
                               }
-                              className="w-full rounded-2xl border border-[#eadfd6] bg-[#fffaf5] px-4 py-3 text-sm text-[#2d2a26] outline-none focus:border-[#e58b6f]"
+                              className="w-full rounded-2xl border border-[#eadfd6] bg-white px-4 py-3 text-sm text-[#2d2a26] outline-none transition focus:border-[#e58b6f]"
                             />
                           </div>
 
@@ -1808,7 +1806,7 @@ export default function PedidoDetalhesPage() {
                                 salvandoFornecedor ===
                                 item.id
                               }
-                              className="w-full rounded-full bg-[#e58b6f] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#c96d53] disabled:cursor-not-allowed disabled:bg-gray-300 lg:w-auto"
+                              className="w-full rounded-2xl bg-[#e58b6f] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#c96d53] disabled:cursor-not-allowed disabled:bg-gray-300 lg:w-auto"
                             >
                               {salvandoFornecedor ===
                               item.id
@@ -1819,7 +1817,8 @@ export default function PedidoDetalhesPage() {
                         </div>
                       </div>
 
-                      <div className="mt-6">
+                      {/* HISTÓRICO */}
+                      <div className="mt-7">
                         <p className="text-sm font-bold text-[#2d2a26]">
                           Histórico do fornecedor
                         </p>
@@ -1876,19 +1875,20 @@ export default function PedidoDetalhesPage() {
                       </div>
                     </div>
 
+                    {/* CONTATO */}
                     {item.fornecedor && (
                       <div className="mt-5 rounded-2xl bg-[#fffaf5] p-5">
                         <h4 className="font-bold text-[#2d2a26]">
                           Contato do fornecedor
                         </h4>
 
-                        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                        <div className="mt-4 grid gap-4 sm:grid-cols-3">
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-wide text-[#a39a92]">
                               E-mail
                             </p>
 
-                            <p className="mt-1 text-sm text-[#756f69]">
+                            <p className="mt-1 break-all text-sm text-[#756f69]">
                               {item.fornecedor
                                 .email ||
                                 "—"}
@@ -1921,7 +1921,7 @@ export default function PedidoDetalhesPage() {
                                 }
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="mt-1 block break-all text-sm font-semibold text-[#e58b6f]"
+                                className="mt-1 block break-all text-sm font-semibold text-[#e58b6f] hover:text-[#c96d53]"
                               >
                                 {
                                   item.fornecedor
@@ -1944,7 +1944,8 @@ export default function PedidoDetalhesPage() {
           </div>
         </section>
 
-        <section className="mt-8 grid gap-6 lg:grid-cols-2">
+        {/* PAGAMENTO E FINANCEIRO */}
+        <section className="mt-6 grid gap-6 lg:grid-cols-2">
           <div className="rounded-3xl border border-[#eadfd6] bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold text-[#2d2a26]">
               Informações do pagamento
@@ -1956,7 +1957,7 @@ export default function PedidoDetalhesPage() {
                   Forma de pagamento
                 </span>
 
-                <strong className="text-[#2d2a26]">
+                <strong className="text-right text-[#2d2a26]">
                   {pedido.pagamento}
                 </strong>
               </div>
@@ -2057,7 +2058,7 @@ export default function PedidoDetalhesPage() {
                   Próxima etapa
                 </span>
 
-                <strong className="text-[#2d2a26]">
+                <strong className="text-right text-[#2d2a26]">
                   {pedido.itens.length === 1
                     ? textoProximaEtapa(
                         statusFornecedor[
@@ -2099,12 +2100,16 @@ export default function PedidoDetalhesPage() {
           </div>
         </section>
 
-        <div className="mt-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        {/* RODAPÉ */}
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Link
             href="/admin/pedidos"
-            className="font-semibold text-[#e58b6f] transition hover:text-[#c96d53]"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-[#eadfd6] bg-white px-5 py-3 text-sm font-bold text-[#2d2a26] shadow-sm transition hover:border-[#e58b6f] hover:bg-[#fff4ec] hover:text-[#c96d53]"
           >
-            ← Voltar para pedidos
+            <span className="text-lg">
+              ←
+            </span>
+            Voltar para pedidos
           </Link>
 
           <button
@@ -2113,13 +2118,12 @@ export default function PedidoDetalhesPage() {
               carregarPedido();
               router.refresh();
             }}
-            className="rounded-full border border-[#eadfd6] bg-white px-5 py-3 text-sm font-semibold text-[#2d2a26] transition hover:bg-[#fff4ec]"
+            className="rounded-full border border-[#eadfd6] bg-white px-5 py-3 text-sm font-semibold text-[#2d2a26] transition hover:border-[#e58b6f] hover:bg-[#fff4ec]"
           >
-            Atualizar página
+            ↻ Atualizar página
           </button>
         </div>
       </div>
     </main>
   );
 }
-
