@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -117,12 +118,92 @@ const STATUS_FORNECEDOR = [
   "ENTREGUE",
 ];
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+/*
+ * A variável NEXT_PUBLIC_API_URL pode estar:
+ *
+ * Local:
+ * http://localhost:3001/api
+ *
+ * Produção:
+ * https://mimo-quatro-patas.onrender.com/api
+ *
+ * Internamente trabalhamos sempre com a URL terminando
+ * em /api para as requisições da API.
+ */
+function obterApiUrl(): string {
+  const configurada =
+    process.env.NEXT_PUBLIC_API_URL?.trim();
+
+  const ambienteLocal =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1");
+
+  let base: string;
+
+  if (configurada) {
+    base = configurada;
+  } else if (ambienteLocal) {
+    base = "http://localhost:3001";
+  } else {
+    base =
+      "https://mimo-quatro-patas.onrender.com";
+  }
+
+  base = base
+    .trim()
+    .replace(/\/+$/, "")
+    .replace(/\/api$/i, "");
+
+  /*
+   * Impede uma configuração antiga de localhost
+   * de ser utilizada na produção.
+   */
+  if (
+    !ambienteLocal &&
+    /^https?:\/\/localhost(?::\d+)?$/i.test(
+      base
+    )
+  ) {
+    base =
+      "https://mimo-quatro-patas.onrender.com";
+  }
+
+  return `${base}/api`;
+}
+
+const API_URL = obterApiUrl();
+
+/*
+ * URL base dos arquivos enviados para /uploads.
+ *
+ * IMPORTANTE:
+ * A API termina em /api, mas as imagens ficam em /uploads.
+ *
+ * Portanto:
+ *
+ * API:
+ * https://mimo-quatro-patas.onrender.com/api
+ *
+ * Imagem:
+ * https://mimo-quatro-patas.onrender.com/uploads/arquivo.jpg
+ */
+function obterBaseArquivos(): string {
+  return API_URL
+    .replace(/\/api\/?$/i, "")
+    .replace(/\/+$/, "");
+}
+
+const ARQUIVOS_URL = obterBaseArquivos();
 
 function formatarPreco(
   valor: string | number | null | undefined
 ): string {
-  if (valor === null || valor === undefined || valor === "") {
+  if (
+    valor === null ||
+    valor === undefined ||
+    valor === ""
+  ) {
     return "R$ 0,00";
   }
 
@@ -154,7 +235,9 @@ function formatarData(
   return data.toLocaleString("pt-BR");
 }
 
-function nomeStatusPedido(status: string): string {
+function nomeStatusPedido(
+  status: string
+): string {
   const nomes: Record<string, string> = {
     PENDENTE: "Pendente",
     PAGO: "Pago",
@@ -167,21 +250,33 @@ function nomeStatusPedido(status: string): string {
   return nomes[status] || status;
 }
 
-function nomeStatusFornecedor(status: string): string {
+function nomeStatusFornecedor(
+  status: string
+): string {
   const nomes: Record<string, string> = {
-    AGUARDANDO_FORNECEDOR: "Aguardando fornecedor",
-    ENCAMINHADO_FORNECEDOR: "Encaminhado ao fornecedor",
+    AGUARDANDO_FORNECEDOR:
+      "Aguardando fornecedor",
+
+    ENCAMINHADO_FORNECEDOR:
+      "Encaminhado ao fornecedor",
+
     PEDIDO_FORNECEDOR_REALIZADO:
       "Pedido do fornecedor realizado",
-    AGUARDANDO_ENVIO: "Aguardando envio",
+
+    AGUARDANDO_ENVIO:
+      "Aguardando envio",
+
     ENVIADO: "Enviado",
+
     ENTREGUE: "Entregue",
   };
 
   return nomes[status] || status;
 }
 
-function classeStatusFornecedor(status: string): string {
+function classeStatusFornecedor(
+  status: string
+): string {
   const classes: Record<string, string> = {
     AGUARDANDO_FORNECEDOR:
       "bg-yellow-100 text-yellow-700",
@@ -202,9 +297,21 @@ function classeStatusFornecedor(status: string): string {
       "bg-green-100 text-green-700",
   };
 
-  return classes[status] || "bg-gray-100 text-gray-600";
+  return (
+    classes[status] ||
+    "bg-gray-100 text-gray-600"
+  );
 }
 
+/*
+ * Constrói a URL correta da imagem.
+ *
+ * Exemplos aceitos:
+ *
+ * /uploads/foto.jpg
+ * uploads/foto.jpg
+ * https://mimo-quatro-patas.onrender.com/uploads/foto.jpg
+ */
 function obterUrlImagem(
   imagem: string | null | undefined
 ): string | null {
@@ -212,22 +319,44 @@ function obterUrlImagem(
     return null;
   }
 
-  if (
-    imagem.startsWith("http://") ||
-    imagem.startsWith("https://")
-  ) {
-    return imagem;
+  const valor = String(imagem).trim();
+
+  if (!valor) {
+    return null;
   }
 
-  const apiBase = (API_URL || "").replace(
-    /\/api\/?$/,
-    ""
-  );
+  /*
+   * Se o banco já tiver uma URL completa,
+   * utilizamos diretamente.
+   */
+  if (
+    valor.startsWith("http://") ||
+    valor.startsWith("https://")
+  ) {
+    return valor;
+  }
 
-  return `${apiBase}${imagem.startsWith("/") ? "" : "/"}${imagem}`;
+  /*
+   * Remove eventual /api que tenha vindo
+   * indevidamente junto do caminho.
+   */
+  let caminho = valor
+    .replace(/^\/+/, "")
+    .replace(/^api\/+/i, "");
+
+  /*
+   * As imagens do projeto ficam em /uploads.
+   */
+  if (!caminho.startsWith("uploads/")) {
+    caminho = `uploads/${caminho}`;
+  }
+
+  return `${ARQUIVOS_URL}/${caminho}`;
 }
 
-function obterProximaEtapa(status: string): string | null {
+function obterProximaEtapa(
+  status: string
+): string | null {
   const fluxo: Record<string, string> = {
     AGUARDANDO_FORNECEDOR:
       "ENCAMINHADO_FORNECEDOR",
@@ -241,15 +370,17 @@ function obterProximaEtapa(status: string): string | null {
     AGUARDANDO_ENVIO:
       "ENVIADO",
 
-    ENVIADO:
-      "ENTREGUE",
+    ENVIADO: "ENTREGUE",
   };
 
   return fluxo[status] || null;
 }
 
-function textoProximaEtapa(status: string): string {
-  const proxima = obterProximaEtapa(status);
+function textoProximaEtapa(
+  status: string
+): string {
+  const proxima =
+    obterProximaEtapa(status);
 
   if (!proxima) {
     return "Fluxo concluído";
@@ -258,7 +389,9 @@ function textoProximaEtapa(status: string): string {
   return nomeStatusFornecedor(proxima);
 }
 
-function indiceStatusFornecedor(status: string): number {
+function indiceStatusFornecedor(
+  status: string
+): number {
   return STATUS_FORNECEDOR.indexOf(status);
 }
 
@@ -313,12 +446,6 @@ export default function PedidoDetalhesPage() {
       setCarregando(true);
       setErro("");
 
-      if (!API_URL) {
-        throw new Error(
-          "A variável NEXT_PUBLIC_API_URL não está configurada."
-        );
-      }
-
       if (!id) {
         throw new Error(
           "ID do pedido não informado."
@@ -332,11 +459,25 @@ export default function PedidoDetalhesPage() {
         }
       );
 
-      const data = await response.json();
+      const texto = await response.text();
+
+      let data: any;
+
+      try {
+        data = JSON.parse(texto);
+      } catch {
+        throw new Error(
+          `A API não retornou JSON. URL: ${API_URL}/pedidos/${id}\n\n${texto.slice(
+            0,
+            500
+          )}`
+        );
+      }
 
       if (!response.ok) {
         throw new Error(
           data?.message ||
+            data?.error ||
             "Não foi possível carregar o pedido."
         );
       }
@@ -353,7 +494,8 @@ export default function PedidoDetalhesPage() {
       setPedido(pedidoRecebido);
 
       setStatusPedido(
-        pedidoRecebido.status || "PENDENTE"
+        pedidoRecebido.status ||
+          "PENDENTE"
       );
 
       const novosStatusFornecedor: Record<
@@ -366,13 +508,15 @@ export default function PedidoDetalhesPage() {
         string
       > = {};
 
-      for (const item of pedidoRecebido.itens || []) {
+      for (const item of pedidoRecebido.itens ||
+        []) {
         novosStatusFornecedor[item.id] =
           item.statusFornecedor ||
           "AGUARDANDO_FORNECEDOR";
 
         novosNumerosFornecedor[item.id] =
-          item.numeroPedidoFornecedor || "";
+          item.numeroPedidoFornecedor ||
+          "";
       }
 
       setStatusFornecedor(
@@ -411,7 +555,7 @@ export default function PedidoDetalhesPage() {
   }
 
   async function atualizarStatusPedido() {
-    if (!pedido || !API_URL) {
+    if (!pedido) {
       return;
     }
 
@@ -433,6 +577,7 @@ export default function PedidoDetalhesPage() {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
+            Accept: "application/json",
           },
           body: JSON.stringify({
             status: statusPedido,
@@ -440,11 +585,25 @@ export default function PedidoDetalhesPage() {
         }
       );
 
-      const data = await response.json();
+      const texto = await response.text();
+
+      let data: any;
+
+      try {
+        data = JSON.parse(texto);
+      } catch {
+        throw new Error(
+          `A API não retornou JSON. URL: ${API_URL}/pedidos/${pedido.id}/status\n\n${texto.slice(
+            0,
+            500
+          )}`
+        );
+      }
 
       if (!response.ok) {
         throw new Error(
           data?.message ||
+            data?.error ||
             "Não foi possível atualizar o status do pedido."
         );
       }
@@ -475,14 +634,6 @@ export default function PedidoDetalhesPage() {
     item: PedidoItem,
     novoStatus: string
   ) {
-    if (!API_URL) {
-      mostrarMensagem(
-        "A variável NEXT_PUBLIC_API_URL não está configurada.",
-        "erro"
-      );
-      return;
-    }
-
     if (!STATUS_FORNECEDOR.includes(novoStatus)) {
       mostrarMensagem(
         "O status do fornecedor é inválido.",
@@ -491,7 +642,10 @@ export default function PedidoDetalhesPage() {
       return;
     }
 
-    if (!item.fornecedorId && !item.fornecedor) {
+    if (
+      !item.fornecedorId &&
+      !item.fornecedor
+    ) {
       mostrarMensagem(
         `O produto "${item.nomeProduto}" está sem fornecedor cadastrado.`,
         "erro"
@@ -510,9 +664,6 @@ export default function PedidoDetalhesPage() {
     const indiceNovo =
       indiceStatusFornecedor(novoStatus);
 
-    /*
-     * Não permite voltar etapas pelo fluxo rápido.
-     */
     if (
       indiceNovo !== -1 &&
       indiceAtual !== -1 &&
@@ -525,15 +676,12 @@ export default function PedidoDetalhesPage() {
       return;
     }
 
-    /*
-     * Para marcar como pedido realizado,
-     * exige o número do pedido no fornecedor.
-     */
     if (
       novoStatus ===
         "PEDIDO_FORNECEDOR_REALIZADO" &&
       !(
-        numeroPedidoFornecedor[item.id] || ""
+        numeroPedidoFornecedor[item.id] ||
+        ""
       ).trim()
     ) {
       mostrarMensagem(
@@ -545,36 +693,19 @@ export default function PedidoDetalhesPage() {
 
     const numeroFornecedor =
       (
-        numeroPedidoFornecedor[item.id] || ""
+        numeroPedidoFornecedor[item.id] ||
+        ""
       ).trim();
 
     try {
       setSalvandoFornecedor(item.id);
       setMensagem("");
 
-      setStatusFornecedor(
-        (anterior) => ({
-          ...anterior,
-          [item.id]: novoStatus,
-        })
-      );
-
       const payload = {
         status: novoStatus,
         numeroPedidoFornecedor:
           numeroFornecedor || null,
       };
-
-      console.log(
-        "[Dropshipping] Ação rápida:",
-        {
-          itemId: item.id,
-          statusAnterior: statusAtual,
-          statusNovo: novoStatus,
-          numeroPedidoFornecedor:
-            numeroFornecedor || null,
-        }
-      );
 
       const response = await fetch(
         `${API_URL}/pedidos/item/${item.id}/fornecedor-status`,
@@ -588,11 +719,25 @@ export default function PedidoDetalhesPage() {
         }
       );
 
-      const data = await response.json();
+      const texto = await response.text();
+
+      let data: any;
+
+      try {
+        data = JSON.parse(texto);
+      } catch {
+        throw new Error(
+          `A API não retornou JSON. URL: ${API_URL}/pedidos/item/${item.id}/fornecedor-status\n\n${texto.slice(
+            0,
+            500
+          )}`
+        );
+      }
 
       if (!response.ok) {
         throw new Error(
           data?.message ||
+            data?.error ||
             "Não foi possível atualizar o status do fornecedor."
         );
       }
@@ -602,7 +747,8 @@ export default function PedidoDetalhesPage() {
 
       if (
         itemAtualizado &&
-        typeof itemAtualizado === "object"
+        typeof itemAtualizado ===
+          "object"
       ) {
         setStatusFornecedor(
           (anterior) => ({
@@ -724,7 +870,8 @@ export default function PedidoDetalhesPage() {
 
     const numeroFornecedor =
       (
-        numeroPedidoFornecedor[item.id] || ""
+        numeroPedidoFornecedor[item.id] ||
+        ""
       ).trim();
 
     const statusConcluido =
@@ -985,8 +1132,6 @@ export default function PedidoDetalhesPage() {
     <main className="min-h-screen bg-[#fffaf5] px-4 py-8 sm:px-6 sm:py-10">
       <div className="mx-auto max-w-7xl">
 
-        {/* CABEÇALHO */}
-
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
           <div>
             <Link
@@ -1048,8 +1193,6 @@ export default function PedidoDetalhesPage() {
           </div>
         </div>
 
-        {/* MENSAGEM */}
-
         {mensagem && (
           <div
             className={`mt-6 rounded-2xl border px-5 py-4 text-sm font-semibold ${
@@ -1062,10 +1205,7 @@ export default function PedidoDetalhesPage() {
           </div>
         )}
 
-        {/* RESUMO */}
-
         <section className="mt-8 grid gap-5 md:grid-cols-4">
-
           <div className="rounded-3xl border border-[#eadfd6] bg-white p-6 shadow-sm">
             <p className="text-sm font-semibold text-[#756f69]">
               Status do pedido
@@ -1112,20 +1252,15 @@ export default function PedidoDetalhesPage() {
               itens entregues ao cliente
             </p>
           </div>
-
         </section>
 
-        {/* CLIENTE E ENDEREÇO */}
-
         <section className="mt-8 grid gap-6 lg:grid-cols-2">
-
           <div className="rounded-3xl border border-[#eadfd6] bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold text-[#2d2a26]">
               Cliente
             </h2>
 
             <div className="mt-5 space-y-4">
-
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#a39a92]">
                   Nome
@@ -1159,7 +1294,6 @@ export default function PedidoDetalhesPage() {
                   </p>
                 </div>
               )}
-
             </div>
           </div>
 
@@ -1169,7 +1303,6 @@ export default function PedidoDetalhesPage() {
             </h2>
 
             <div className="mt-5 space-y-2 text-[#756f69]">
-
               {pedido.cep && (
                 <p>
                   <strong className="text-[#2d2a26]">
@@ -1219,16 +1352,11 @@ export default function PedidoDetalhesPage() {
                     Endereço não informado.
                   </p>
                 )}
-
             </div>
           </div>
-
         </section>
 
-        {/* PRODUTOS / DROPSHIPPING */}
-
         <section className="mt-8 rounded-3xl border border-[#eadfd6] bg-white shadow-sm">
-
           <div className="border-b border-[#eadfd6] px-6 py-6">
             <h2 className="text-xl font-bold text-[#2d2a26]">
               Itens do pedido
@@ -1240,7 +1368,6 @@ export default function PedidoDetalhesPage() {
           </div>
 
           <div className="divide-y divide-[#eadfd6]">
-
             {pedido.itens.map(
               (item) => {
                 const imagemUrl =
@@ -1278,27 +1405,30 @@ export default function PedidoDetalhesPage() {
                     key={item.id}
                     className="p-6"
                   >
-
-                    {/* PRODUTO */}
-
                     <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-
                       <div className="flex gap-4">
-
                         <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#fff4ec]">
-
                           {imagemUrl ? (
                             <img
                               src={imagemUrl}
                               alt={`${item.nomeProduto} - produto`}
                               className="h-full w-full object-cover"
+                              loading="lazy"
+                              onError={(event) => {
+                                /*
+                                 * Se o arquivo físico não existir,
+                                 * escondemos a imagem quebrada sem
+                                 * quebrar o restante do pedido.
+                                 */
+                                event.currentTarget.style.display =
+                                  "none";
+                              }}
                             />
                           ) : (
                             <span className="text-4xl">
                               📦
                             </span>
                           )}
-
                         </div>
 
                         <div>
@@ -1312,7 +1442,6 @@ export default function PedidoDetalhesPage() {
                           </h3>
 
                           <div className="mt-3 flex flex-wrap gap-2">
-
                             <span className="rounded-full bg-[#fff4ec] px-3 py-1 text-xs font-bold text-[#c96d53]">
                               Qtd:{" "}
                               {item.quantidade}
@@ -1327,14 +1456,11 @@ export default function PedidoDetalhesPage() {
                                 statusAtual
                               )}
                             </span>
-
                           </div>
                         </div>
-
                       </div>
 
                       <div className="text-left xl:text-right">
-
                         <p className="text-sm text-[#756f69]">
                           Preço unitário
                         </p>
@@ -1353,18 +1479,12 @@ export default function PedidoDetalhesPage() {
                             )}
                           </strong>
                         </p>
-
                       </div>
-
                     </div>
-
-                    {/* LINHA DO FLUXO */}
 
                     <div className="mt-6 overflow-x-auto">
                       <div className="min-w-[760px]">
-
                         <div className="flex items-center">
-
                           {STATUS_FORNECEDOR.map(
                             (
                               status,
@@ -1384,7 +1504,6 @@ export default function PedidoDetalhesPage() {
                                   className="flex flex-1 items-center"
                                 >
                                   <div className="flex flex-col items-center text-center">
-
                                     <div
                                       className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-xs font-bold ${
                                         concluido
@@ -1411,7 +1530,6 @@ export default function PedidoDetalhesPage() {
                                         status
                                       )}
                                     </p>
-
                                   </div>
 
                                   {index <
@@ -1426,23 +1544,16 @@ export default function PedidoDetalhesPage() {
                                       }`}
                                     />
                                   )}
-
                                 </div>
                               );
                             }
                           )}
-
                         </div>
-
                       </div>
                     </div>
 
-                    {/* DADOS DO FORNECEDOR */}
-
                     <div className="mt-6 rounded-2xl bg-[#fffaf5] p-5">
-
                       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-
                         <div>
                           <h4 className="font-bold text-[#2d2a26]">
                             Fornecedor
@@ -1462,11 +1573,9 @@ export default function PedidoDetalhesPage() {
                             Sem fornecedor
                           </span>
                         )}
-
                       </div>
 
                       <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-wide text-[#a39a92]">
                             Nome
@@ -1517,11 +1626,9 @@ export default function PedidoDetalhesPage() {
                               : "—"}
                           </p>
                         </div>
-
                       </div>
 
                       <div className="mt-4 grid gap-4 md:grid-cols-2">
-
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-wide text-[#a39a92]">
                             Custo total do fornecedor
@@ -1548,7 +1655,9 @@ export default function PedidoDetalhesPage() {
                               rel="noopener noreferrer"
                               className="mt-1 inline-block break-all text-sm font-semibold text-[#e58b6f] hover:text-[#c96d53]"
                             >
-                              {item.linkFornecedor}
+                              {
+                                item.linkFornecedor
+                              }
                             </a>
                           ) : (
                             <p className="mt-1 text-sm text-[#756f69]">
@@ -1556,7 +1665,6 @@ export default function PedidoDetalhesPage() {
                             </p>
                           )}
                         </div>
-
                       </div>
 
                       {!item.fornecedor && (
@@ -1564,15 +1672,10 @@ export default function PedidoDetalhesPage() {
                           Este produto está sem fornecedor cadastrado. Cadastre ou associe um fornecedor antes de encaminhar o pedido.
                         </div>
                       )}
-
                     </div>
 
-                    {/* FLUXO DO FORNECEDOR */}
-
                     <div className="mt-6 rounded-2xl border border-[#eadfd6] p-5">
-
                       <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
-
                         <div>
                           <h4 className="font-bold text-[#2d2a26]">
                             Operação de dropshipping
@@ -1592,26 +1695,19 @@ export default function PedidoDetalhesPage() {
                             statusAtual
                           )}
                         </span>
-
                       </div>
-
-                      {/* PRÓXIMA AÇÃO */}
 
                       {renderizarAcoesFornecedor(
                         item,
                         statusAtual
                       )}
 
-                      {/* CONTROLE MANUAL */}
-
                       <div className="mt-6 border-t border-[#eadfd6] pt-5">
-
                         <p className="text-sm font-bold text-[#2d2a26]">
                           Controle manual
                         </p>
 
                         <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1fr_auto]">
-
                           <div>
                             <label
                               htmlFor={`status-fornecedor-${item.id}`}
@@ -1720,20 +1816,15 @@ export default function PedidoDetalhesPage() {
                                 : "Salvar etapa"}
                             </button>
                           </div>
-
                         </div>
                       </div>
 
-                      {/* HISTÓRICO */}
-
                       <div className="mt-6">
-
                         <p className="text-sm font-bold text-[#2d2a26]">
                           Histórico do fornecedor
                         </p>
 
                         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-
                           <div className="rounded-2xl bg-[#fffaf5] p-4">
                             <p className="text-xs font-semibold text-[#a39a92]">
                               Encaminhamento
@@ -1781,23 +1872,17 @@ export default function PedidoDetalhesPage() {
                               )}
                             </p>
                           </div>
-
                         </div>
                       </div>
-
                     </div>
-
-                    {/* CONTATOS */}
 
                     {item.fornecedor && (
                       <div className="mt-5 rounded-2xl bg-[#fffaf5] p-5">
-
                         <h4 className="font-bold text-[#2d2a26]">
                           Contato do fornecedor
                         </h4>
 
                         <div className="mt-4 grid gap-3 sm:grid-cols-3">
-
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-wide text-[#a39a92]">
                               E-mail
@@ -1849,31 +1934,23 @@ export default function PedidoDetalhesPage() {
                               </p>
                             )}
                           </div>
-
                         </div>
                       </div>
                     )}
-
                   </article>
                 );
               }
             )}
-
           </div>
         </section>
 
-        {/* RESUMO FINANCEIRO */}
-
         <section className="mt-8 grid gap-6 lg:grid-cols-2">
-
           <div className="rounded-3xl border border-[#eadfd6] bg-white p-6 shadow-sm">
-
             <h2 className="text-xl font-bold text-[#2d2a26]">
               Informações do pagamento
             </h2>
 
             <div className="mt-5 space-y-4">
-
               <div className="flex justify-between gap-4">
                 <span className="text-[#756f69]">
                   Forma de pagamento
@@ -1942,20 +2019,15 @@ export default function PedidoDetalhesPage() {
                   </strong>
                 </div>
               </div>
-
             </div>
           </div>
 
-          {/* DROPSHIPPING */}
-
           <div className="rounded-3xl border border-[#eadfd6] bg-white p-6 shadow-sm">
-
             <h2 className="text-xl font-bold text-[#2d2a26]">
               Resumo do dropshipping
             </h2>
 
             <div className="mt-5 space-y-4">
-
               <div className="flex justify-between gap-4">
                 <span className="text-[#756f69]">
                   Receita dos produtos
@@ -2000,9 +2072,7 @@ export default function PedidoDetalhesPage() {
               </div>
 
               <div className="border-t border-[#eadfd6] pt-4">
-
                 <div className="flex justify-between gap-4">
-
                   <span className="font-bold text-[#2d2a26]">
                     Margem bruta dos produtos
                   </span>
@@ -2019,24 +2089,17 @@ export default function PedidoDetalhesPage() {
                       margemBrutaProdutos
                     )}
                   </strong>
-
                 </div>
-
               </div>
 
               <p className="pt-2 text-xs leading-5 text-[#a39a92]">
                 A margem acima considera apenas a diferença entre o valor vendido dos produtos e o custo informado dos fornecedores. Não considera impostos, taxas de pagamento, frete ou outras despesas operacionais.
               </p>
-
             </div>
           </div>
-
         </section>
 
-        {/* RODAPÉ */}
-
         <div className="mt-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-
           <Link
             href="/admin/pedidos"
             className="font-semibold text-[#e58b6f] transition hover:text-[#c96d53]"
@@ -2054,10 +2117,9 @@ export default function PedidoDetalhesPage() {
           >
             Atualizar página
           </button>
-
         </div>
-
       </div>
     </main>
   );
 }
+
