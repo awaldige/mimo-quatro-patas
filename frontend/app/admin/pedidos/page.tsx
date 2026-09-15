@@ -1,6 +1,6 @@
-
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 interface Pedido {
@@ -345,6 +345,18 @@ export default function PedidosAdminPage() {
   return (
     <main className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="mx-auto max-w-7xl">
+
+        {/* VOLTAR AO PAINEL ADMINISTRATIVO */}
+        <div className="mb-5">
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-2 rounded-full border border-[#eadfd6] bg-white px-5 py-3 text-sm font-bold text-[#2d2a26] shadow-sm transition hover:border-[#e58b6f] hover:bg-[#fff4ec] hover:text-[#c96d53]"
+          >
+            <span className="text-lg">←</span>
+            Voltar ao Painel Administrativo
+          </Link>
+        </div>
+
         <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
@@ -803,4 +815,3 @@ export default function PedidosAdminPage() {
     </main>
   );
 }
-
