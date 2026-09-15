@@ -1,4 +1,7 @@
+
 const prisma = require("../config/prisma");
+const path = require("path");
+const uploadImagem = require("../config/uploadCloudinary");
 
 // ======================================================
 // LISTAR PRODUTOS
@@ -249,7 +252,8 @@ async function criarProduto(req, res) {
       ) {
         return res.status(400).json({
           success: false,
-          message: "O custo do fornecedor informado é inválido.",
+          message:
+            "O custo do fornecedor informado é inválido.",
         });
       }
     }
@@ -269,9 +273,29 @@ async function criarProduto(req, res) {
     // IMAGEM
     // --------------------------------------------------
 
-    const imagem = req.file
-      ? `/uploads/${req.file.filename}`
-      : null;
+    let imagem = null;
+
+    if (req.file) {
+      const extensao = path.extname(
+        req.file.originalname
+      );
+
+      const nomeBase = path
+        .basename(
+          req.file.originalname,
+          extensao
+        )
+        .replace(/[^a-zA-Z0-9-_]/g, "-");
+
+      const nomeCloudinary = `${nomeBase}-${Date.now()}`;
+
+      const resultadoUpload = await uploadImagem(
+        req.file.buffer,
+        nomeCloudinary
+      );
+
+      imagem = resultadoUpload.secure_url;
+    }
 
     // --------------------------------------------------
     // CRIAÇÃO
@@ -516,8 +540,25 @@ async function atualizarProduto(req, res) {
     // --------------------------------------------------
 
     if (req.file) {
-      dados.imagem =
-        `/uploads/${req.file.filename}`;
+      const extensao = path.extname(
+        req.file.originalname
+      );
+
+      const nomeBase = path
+        .basename(
+          req.file.originalname,
+          extensao
+        )
+        .replace(/[^a-zA-Z0-9-_]/g, "-");
+
+      const nomeCloudinary = `${nomeBase}-${Date.now()}`;
+
+      const resultadoUpload = await uploadImagem(
+        req.file.buffer,
+        nomeCloudinary
+      );
+
+      dados.imagem = resultadoUpload.secure_url;
     }
 
     // --------------------------------------------------
@@ -725,3 +766,4 @@ module.exports = {
   atualizarProduto,
   excluirProduto,
 };
+
